@@ -26,6 +26,20 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Handle 401 responses by redirecting to login
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Clear the token
+      localStorage.removeItem('apiKey');
+      // Redirect to login page
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Auth API
 export const auth = {
   login: async (username: string, password: string) => {

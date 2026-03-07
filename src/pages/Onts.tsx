@@ -28,6 +28,8 @@ import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
@@ -35,6 +37,7 @@ import { onts, olts } from '../services/api.ts';
 
 const columns = [
   { id: 'serial_number', label: 'Serial Number' },
+  { id: 'sap_id', label: 'SAP ID' },
   { id: 'vendor', label: 'Vendor' },
   { id: 'model', label: 'Model' },
   { 
@@ -99,6 +102,10 @@ const Onts: React.FC = () => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [confirmStartTroubleshoot, setConfirmStartTroubleshoot] = useState(false);
   const [isStartingTroubleshoot, setIsStartingTroubleshoot] = useState(false);
+  const [jsonDialogOpen, setJsonDialogOpen] = useState(false);
+  const [jsonDialogContent, setJsonDialogContent] = useState<any>(null);
+  const [jsonDialogTitle, setJsonDialogTitle] = useState('');
+  const [copySuccess, setCopySuccess] = useState(false);
 
   // Debounce search input
   useEffect(() => {
@@ -217,6 +224,16 @@ const Onts: React.FC = () => {
     }
   };
 
+  const handleCopyJson = async () => {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(jsonDialogContent, null, 2));
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+    }
+  };
+
   if (isLoading && !data) {
     return (
       <Layout>
@@ -257,13 +274,6 @@ const Onts: React.FC = () => {
               ),
             }}
           />
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => setDialogOpen(true)}
-          >
-            Add New ONT
-          </Button>
         </Box>
       </Box>
 
@@ -425,7 +435,7 @@ const Onts: React.FC = () => {
                                   <Typography variant="subtitle2" gutterBottom component="div" color="primary" sx={{ mt: 1, mb: 1 }}>
                                     General Information
                                   </Typography>
-                                  <Grid container spacing={1} sx={{ mb: 2 }}>
+                                  <Grid container spacing={1} sx={{ mb: 2, p: 1.5, border: 1, borderColor: 'grey.300', borderRadius: 1 }}>
                                     {['serial_number', 'olt_ip_address', 'ont_port', 'ont_admin_status', 'ont_operational_status'].map((key) => {
                                       const value = troubleshoot[key];
                                       if (value === undefined) return null;
@@ -473,13 +483,100 @@ const Onts: React.FC = () => {
                                         </Grid>
                                       );
                                     })}
+                                    {/* Special handling for ingress_stats */}
+                                    {troubleshoot.ingress_stats && typeof troubleshoot.ingress_stats === 'object' && (
+                                      <>
+                                        <Grid item xs={12} sm={6} md={3}>
+                                          <Box>
+                                            <Typography 
+                                              variant="caption" 
+                                              color="primary.main"
+                                              sx={{ 
+                                                fontWeight: 600, 
+                                                textTransform: 'uppercase',
+                                                letterSpacing: 0.5,
+                                                display: 'block',
+                                                mb: 0.3,
+                                                fontSize: '0.7rem'
+                                              }}
+                                            >
+                                              Offered Packets
+                                            </Typography>
+                                            <Box 
+                                              sx={{ 
+                                                p: 0.5,
+                                                border: 1,
+                                                borderColor: 'divider',
+                                                borderRadius: 1,
+                                                transition: 'border-color 0.2s',
+                                                '&:hover': {
+                                                  borderColor: 'primary.main',
+                                                }
+                                              }}
+                                            >
+                                              <Typography 
+                                                variant="body2" 
+                                                sx={{ 
+                                                  wordBreak: 'break-word',
+                                                  color: 'text.primary',
+                                                  fontSize: '0.8rem'
+                                                }}
+                                              >
+                                                {troubleshoot.ingress_stats.offered_packets || 'N/A'}
+                                              </Typography>
+                                            </Box>
+                                          </Box>
+                                        </Grid>
+                                        <Grid item xs={12} sm={6} md={3}>
+                                          <Box>
+                                            <Typography 
+                                              variant="caption" 
+                                              color="primary.main"
+                                              sx={{ 
+                                                fontWeight: 600, 
+                                                textTransform: 'uppercase',
+                                                letterSpacing: 0.5,
+                                                display: 'block',
+                                                mb: 0.3,
+                                                fontSize: '0.7rem'
+                                              }}
+                                            >
+                                              Dropped Packets
+                                            </Typography>
+                                            <Box 
+                                              sx={{ 
+                                                p: 0.5,
+                                                border: 1,
+                                                borderColor: 'divider',
+                                                borderRadius: 1,
+                                                transition: 'border-color 0.2s',
+                                                '&:hover': {
+                                                  borderColor: 'primary.main',
+                                                }
+                                              }}
+                                            >
+                                              <Typography 
+                                                variant="body2" 
+                                                sx={{ 
+                                                  wordBreak: 'break-word',
+                                                  color: 'text.primary',
+                                                  fontSize: '0.8rem'
+                                                }}
+                                              >
+                                                {troubleshoot.ingress_stats.dropped_packets || 'N/A'}
+                                              </Typography>
+                                            </Box>
+                                          </Box>
+                                        </Grid>
+                                      </>
+                                    )}
                                   </Grid>
 
                                   {/* Optical Section */}
                                   <Typography variant="subtitle2" gutterBottom component="div" color="primary" sx={{ mt: 1, mb: 1 }}>
                                     Optical
                                   </Typography>
-                                  <Grid container spacing={1} sx={{ mb: 2 }}>
+                                  <Grid container spacing={1} sx={{ mb: 2, p: 1.5, border: 1, borderColor: 'grey.300', borderRadius: 1 }}>
                                     {['distance', 'olt_rx_level', 'ont_rx_level', 'ont_tx_level', 'expected_loss', 'actual_loss', 'margin', 'link_quality'].map((key) => {
                                       const value = troubleshoot[key];
                                       if (value === undefined) return null;
@@ -535,52 +632,141 @@ const Onts: React.FC = () => {
                                       <Typography variant="subtitle2" gutterBottom component="div" color="primary" sx={{ mt: 1, mb: 1 }}>
                                         Radius
                                       </Typography>
-                                      <Grid container spacing={1} sx={{ mb: 2 }}>
-                                        {Object.entries(troubleshoot.radius).map(([key, value]) => (
-                                          <Grid item xs={12} sm={6} md={3} key={key}>
-                                            <Box>
-                                              <Typography 
-                                                variant="caption" 
-                                                color="primary.main"
-                                                sx={{ 
-                                                  fontWeight: 600, 
-                                                  textTransform: 'uppercase',
-                                                  letterSpacing: 0.5,
-                                                  display: 'block',
-                                                  mb: 0.3,
-                                                  fontSize: '0.7rem'
-                                                }}
-                                              >
-                                                {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                              </Typography>
-                                              <Box 
-                                                sx={{ 
-                                                  p: 0.5,
-                                                  border: 1,
-                                                  borderColor: 'divider',
-                                                  borderRadius: 1,
-                                                  transition: 'border-color 0.2s',
-                                                  '&:hover': {
-                                                    borderColor: 'primary.main',
-                                                  }
-                                                }}
-                                              >
+                                      <Grid container spacing={1} sx={{ mb: 2, p: 1.5, border: 1, borderColor: 'grey.300', borderRadius: 1 }}>
+                                        {Object.entries(troubleshoot.radius).map(([key, value]) => {
+                                          // Special handling for radpostauth array
+                                          if (key === 'radpostauth' && Array.isArray(value) && value.length > 0) {
+                                            return (
+                                              <Grid item xs={12} key={key}>
+                                                <Box>
+                                                  <Typography 
+                                                    variant="caption" 
+                                                    color="primary.main"
+                                                    sx={{ 
+                                                      fontWeight: 600, 
+                                                      textTransform: 'uppercase',
+                                                      letterSpacing: 0.5,
+                                                      display: 'block',
+                                                      mb: 0.5,
+                                                      fontSize: '0.7rem'
+                                                    }}
+                                                  >
+                                                    {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                                                  </Typography>
+                                                  <TableContainer component={Paper} sx={{ border: 1, borderColor: 'divider' }}>
+                                                    <Table size="small">
+                                                      <TableHead>
+                                                        <TableRow sx={{ backgroundColor: 'primary.light' }}>
+                                                          <TableCell sx={{ fontWeight: 600 }}>ID</TableCell>
+                                                          <TableCell sx={{ fontWeight: 600 }}>Username</TableCell>
+                                                          <TableCell sx={{ fontWeight: 600 }}>Reply</TableCell>
+                                                          <TableCell sx={{ fontWeight: 600 }}>Auth Date</TableCell>
+                                                          <TableCell sx={{ fontWeight: 600 }}>Class</TableCell>
+                                                        </TableRow>
+                                                      </TableHead>
+                                                      <TableBody>
+                                                        {value.map((row: any, index: number) => (
+                                                          <TableRow key={row.id || index}>
+                                                            <TableCell>{row.id || 'N/A'}</TableCell>
+                                                            <TableCell>{row.username || 'N/A'}</TableCell>
+                                                            <TableCell>{row.reply || 'N/A'}</TableCell>
+                                                            <TableCell>{row.authdate || 'N/A'}</TableCell>
+                                                            <TableCell>{row.class || 'N/A'}</TableCell>
+                                                          </TableRow>
+                                                        ))}
+                                                      </TableBody>
+                                                    </Table>
+                                                  </TableContainer>
+                                                </Box>
+                                              </Grid>
+                                            );
+                                          }
+                                          
+                                          // Default rendering for other fields
+                                          return (
+                                            <Grid item xs={12} sm={6} md={3} key={key}>
+                                              <Box>
                                                 <Typography 
-                                                  variant="body2" 
+                                                  variant="caption" 
+                                                  color="primary.main"
                                                   sx={{ 
-                                                    wordBreak: 'break-word',
-                                                    color: value ? 'text.primary' : 'text.disabled',
-                                                    fontSize: '0.8rem'
+                                                    fontWeight: 600, 
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: 0.5,
+                                                    display: 'block',
+                                                    mb: 0.3,
+                                                    fontSize: '0.7rem'
                                                   }}
                                                 >
-                                                  {value !== null && value !== undefined 
-                                                    ? (typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value))
-                                                    : 'N/A'}
+                                                  {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                                 </Typography>
+                                                <Box 
+                                                  sx={{ 
+                                                    p: 0.5,
+                                                    border: 1,
+                                                    borderColor: 'divider',
+                                                    borderRadius: 1,
+                                                    transition: 'border-color 0.2s',
+                                                    '&:hover': {
+                                                      borderColor: 'primary.main',
+                                                    },
+                                                    position: 'relative'
+                                                  }}
+                                                >
+                                                  {typeof value === 'object' && value !== null ? (
+                                                    <>
+                                                      <Typography 
+                                                        variant="body2" 
+                                                        sx={{ 
+                                                          wordBreak: 'break-word',
+                                                          color: 'text.primary',
+                                                          fontSize: '0.8rem',
+                                                          whiteSpace: 'pre-wrap',
+                                                          maxHeight: '60px',
+                                                          overflow: 'hidden',
+                                                          textOverflow: 'ellipsis'
+                                                        }}
+                                                      >
+                                                        {JSON.stringify(value, null, 2).substring(0, 100)}...
+                                                      </Typography>
+                                                      <IconButton
+                                                        size="small"
+                                                        onClick={() => {
+                                                          setJsonDialogTitle(key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
+                                                          setJsonDialogContent(value);
+                                                          setJsonDialogOpen(true);
+                                                        }}
+                                                        sx={{
+                                                          position: 'absolute',
+                                                          bottom: 2,
+                                                          right: 2,
+                                                          backgroundColor: 'background.paper',
+                                                          color: 'primary.main',
+                                                          '&:hover': {
+                                                            backgroundColor: 'action.hover',
+                                                          }
+                                                        }}
+                                                      >
+                                                        <ExpandMoreIcon fontSize="small" />
+                                                      </IconButton>
+                                                    </>
+                                                  ) : (
+                                                    <Typography 
+                                                      variant="body2" 
+                                                      sx={{ 
+                                                        wordBreak: 'break-word',
+                                                        color: value ? 'text.primary' : 'text.disabled',
+                                                        fontSize: '0.8rem'
+                                                      }}
+                                                    >
+                                                      {value !== null && value !== undefined ? String(value) : 'N/A'}
+                                                    </Typography>
+                                                  )}
+                                                </Box>
                                               </Box>
-                                            </Box>
-                                          </Grid>
-                                        ))}
+                                            </Grid>
+                                          );
+                                        })}
                                       </Grid>
                                     </>
                                   )}
@@ -591,53 +777,302 @@ const Onts: React.FC = () => {
                                       <Typography variant="subtitle2" gutterBottom component="div" color="primary" sx={{ mt: 1, mb: 1 }}>
                                         BNG
                                       </Typography>
-                                      <Grid container spacing={1} sx={{ mb: 2 }}>
-                                        {Object.entries(troubleshoot.bng).map(([key, value]) => (
-                                          <Grid item xs={12} sm={6} md={3} key={key}>
-                                            <Box>
-                                              <Typography 
-                                                variant="caption" 
-                                                color="primary.main"
-                                                sx={{ 
-                                                  fontWeight: 600, 
-                                                  textTransform: 'uppercase',
-                                                  letterSpacing: 0.5,
-                                                  display: 'block',
-                                                  mb: 0.3,
-                                                  fontSize: '0.7rem'
-                                                }}
-                                              >
-                                                {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                              </Typography>
-                                              <Box 
-                                                sx={{ 
-                                                  p: 0.5,
-                                                  border: 1,
-                                                  borderColor: 'divider',
-                                                  borderRadius: 1,
-                                                  transition: 'border-color 0.2s',
-                                                  '&:hover': {
-                                                    borderColor: 'primary.main',
-                                                  }
-                                                }}
-                                              >
+                                      <Grid container spacing={1} sx={{ mb: 2, p: 1.5, border: 1, borderColor: 'grey.300', borderRadius: 1 }}>
+                                        {Object.entries(troubleshoot.bng).map(([key, value]) => {
+                                          // Special handling for ingress_stats
+                                          if (key === 'ingress_stats' && typeof value === 'object' && value !== null) {
+                                            return (
+                                              <Grid item xs={12} key={key}>
+                                                <Box sx={{ mb: 1 }}>
+                                                  <Typography 
+                                                    variant="caption" 
+                                                    color="primary.main"
+                                                    sx={{ 
+                                                      fontWeight: 600, 
+                                                      textTransform: 'uppercase',
+                                                      letterSpacing: 0.5,
+                                                      display: 'block',
+                                                      mb: 0.5,
+                                                      fontSize: '0.7rem'
+                                                    }}
+                                                  >
+                                                    Ingress Stats
+                                                  </Typography>
+                                                  <Grid container spacing={1} sx={{ p: 1, border: 1, borderColor: 'grey.300', borderRadius: 1 }}>
+                                                    <Grid item xs={12} sm={6} md={3}>
+                                                      <Box>
+                                                        <Typography 
+                                                          variant="caption" 
+                                                          sx={{ 
+                                                            fontWeight: 500,
+                                                            display: 'block',
+                                                            mb: 0.3,
+                                                            fontSize: '0.65rem',
+                                                            color: 'text.secondary'
+                                                          }}
+                                                        >
+                                                          Offered Packets
+                                                        </Typography>
+                                                        <Box 
+                                                          sx={{ 
+                                                            p: 0.5,
+                                                            border: 1,
+                                                            borderColor: 'divider',
+                                                            borderRadius: 1,
+                                                            transition: 'border-color 0.2s',
+                                                            '&:hover': {
+                                                              borderColor: 'primary.main',
+                                                            }
+                                                          }}
+                                                        >
+                                                          <Typography 
+                                                            variant="body2" 
+                                                            sx={{ 
+                                                              wordBreak: 'break-word',
+                                                              color: 'text.primary',
+                                                              fontSize: '0.8rem'
+                                                            }}
+                                                          >
+                                                            {(value as any).offered_packets || 'N/A'}
+                                                          </Typography>
+                                                        </Box>
+                                                      </Box>
+                                                    </Grid>
+                                                    <Grid item xs={12} sm={6} md={3}>
+                                                      <Box>
+                                                        <Typography 
+                                                          variant="caption" 
+                                                          sx={{ 
+                                                            fontWeight: 500,
+                                                            display: 'block',
+                                                            mb: 0.3,
+                                                            fontSize: '0.65rem',
+                                                            color: 'text.secondary'
+                                                          }}
+                                                        >
+                                                          Dropped Packets
+                                                        </Typography>
+                                                        <Box 
+                                                          sx={{ 
+                                                            p: 0.5,
+                                                            border: 1,
+                                                            borderColor: 'divider',
+                                                            borderRadius: 1,
+                                                            transition: 'border-color 0.2s',
+                                                            '&:hover': {
+                                                              borderColor: 'primary.main',
+                                                            }
+                                                          }}
+                                                        >
+                                                          <Typography 
+                                                            variant="body2" 
+                                                            sx={{ 
+                                                              wordBreak: 'break-word',
+                                                              color: 'text.primary',
+                                                              fontSize: '0.8rem'
+                                                            }}
+                                                          >
+                                                            {(value as any).dropped_packets || 'N/A'}
+                                                          </Typography>
+                                                        </Box>
+                                                      </Box>
+                                                    </Grid>
+                                                  </Grid>
+                                                </Box>
+                                              </Grid>
+                                            );
+                                          }
+                                          
+                                          // Special handling for egress_stats
+                                          if (key === 'egress_stats' && typeof value === 'object' && value !== null) {
+                                            return (
+                                              <Grid item xs={12} key={key}>
+                                                <Box sx={{ mb: 1 }}>
+                                                  <Typography 
+                                                    variant="caption" 
+                                                    color="primary.main"
+                                                    sx={{ 
+                                                      fontWeight: 600, 
+                                                      textTransform: 'uppercase',
+                                                      letterSpacing: 0.5,
+                                                      display: 'block',
+                                                      mb: 0.5,
+                                                      fontSize: '0.7rem'
+                                                    }}
+                                                  >
+                                                    Egress Stats
+                                                  </Typography>
+                                                  <Grid container spacing={1} sx={{ p: 1, border: 1, borderColor: 'grey.300', borderRadius: 1 }}>
+                                                    <Grid item xs={12} sm={6} md={3}>
+                                                      <Box>
+                                                        <Typography 
+                                                          variant="caption" 
+                                                          sx={{ 
+                                                            fontWeight: 500,
+                                                            display: 'block',
+                                                            mb: 0.3,
+                                                            fontSize: '0.65rem',
+                                                            color: 'text.secondary'
+                                                          }}
+                                                        >
+                                                          Forwarded Packets
+                                                        </Typography>
+                                                        <Box 
+                                                          sx={{ 
+                                                            p: 0.5,
+                                                            border: 1,
+                                                            borderColor: 'divider',
+                                                            borderRadius: 1,
+                                                            transition: 'border-color 0.2s',
+                                                            '&:hover': {
+                                                              borderColor: 'primary.main',
+                                                            }
+                                                          }}
+                                                        >
+                                                          <Typography 
+                                                            variant="body2" 
+                                                            sx={{ 
+                                                              wordBreak: 'break-word',
+                                                              color: 'text.primary',
+                                                              fontSize: '0.8rem'
+                                                            }}
+                                                          >
+                                                            {(value as any).forwarded_packets || 'N/A'}
+                                                          </Typography>
+                                                        </Box>
+                                                      </Box>
+                                                    </Grid>
+                                                    <Grid item xs={12} sm={6} md={3}>
+                                                      <Box>
+                                                        <Typography 
+                                                          variant="caption" 
+                                                          sx={{ 
+                                                            fontWeight: 500,
+                                                            display: 'block',
+                                                            mb: 0.3,
+                                                            fontSize: '0.65rem',
+                                                            color: 'text.secondary'
+                                                          }}
+                                                        >
+                                                          Dropped Packets
+                                                        </Typography>
+                                                        <Box 
+                                                          sx={{ 
+                                                            p: 0.5,
+                                                            border: 1,
+                                                            borderColor: 'divider',
+                                                            borderRadius: 1,
+                                                            transition: 'border-color 0.2s',
+                                                            '&:hover': {
+                                                              borderColor: 'primary.main',
+                                                            }
+                                                          }}
+                                                        >
+                                                          <Typography 
+                                                            variant="body2" 
+                                                            sx={{ 
+                                                              wordBreak: 'break-word',
+                                                              color: 'text.primary',
+                                                              fontSize: '0.8rem'
+                                                            }}
+                                                          >
+                                                            {(value as any).dropped_packets || 'N/A'}
+                                                          </Typography>
+                                                        </Box>
+                                                      </Box>
+                                                    </Grid>
+                                                  </Grid>
+                                                </Box>
+                                              </Grid>
+                                            );
+                                          }
+                                          
+                                          // Default rendering for other fields
+                                          return (
+                                            <Grid item xs={12} sm={6} md={3} key={key}>
+                                              <Box>
                                                 <Typography 
-                                                  variant="body2" 
+                                                  variant="caption" 
+                                                  color="primary.main"
                                                   sx={{ 
-                                                    wordBreak: 'break-word',
-                                                    color: value ? 'text.primary' : 'text.disabled',
-                                                    fontSize: '0.8rem',
-                                                    whiteSpace: 'pre-wrap'
+                                                    fontWeight: 600, 
+                                                    textTransform: 'uppercase',
+                                                    letterSpacing: 0.5,
+                                                    display: 'block',
+                                                    mb: 0.3,
+                                                    fontSize: '0.7rem'
                                                   }}
                                                 >
-                                                  {value !== null && value !== undefined 
-                                                    ? (typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value))
-                                                    : 'N/A'}
+                                                  {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                                 </Typography>
+                                                <Box 
+                                                  sx={{ 
+                                                    p: 0.5,
+                                                    border: 1,
+                                                    borderColor: 'divider',
+                                                    borderRadius: 1,
+                                                    transition: 'border-color 0.2s',
+                                                    '&:hover': {
+                                                      borderColor: 'primary.main',
+                                                    },
+                                                    position: 'relative'
+                                                  }}
+                                                >
+                                                  {typeof value === 'object' && value !== null ? (
+                                                    <>
+                                                      <Typography 
+                                                        variant="body2" 
+                                                        sx={{ 
+                                                          wordBreak: 'break-word',
+                                                          color: 'text.primary',
+                                                          fontSize: '0.8rem',
+                                                          whiteSpace: 'pre-wrap',
+                                                          maxHeight: '60px',
+                                                          overflow: 'hidden',
+                                                          textOverflow: 'ellipsis'
+                                                        }}
+                                                      >
+                                                        {JSON.stringify(value, null, 2).substring(0, 100)}...
+                                                      </Typography>
+                                                      <IconButton
+                                                        size="small"
+                                                        onClick={() => {
+                                                          setJsonDialogTitle(key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()));
+                                                          setJsonDialogContent(value);
+                                                          setJsonDialogOpen(true);
+                                                        }}
+                                                        sx={{
+                                                          position: 'absolute',
+                                                          bottom: 2,
+                                                          right: 2,
+                                                          backgroundColor: 'background.paper',
+                                                          color: 'primary.main',
+                                                          '&:hover': {
+                                                            backgroundColor: 'action.hover',
+                                                          }
+                                                        }}
+                                                      >
+                                                        <ExpandMoreIcon fontSize="small" />
+                                                      </IconButton>
+                                                    </>
+                                                  ) : (
+                                                    <Typography 
+                                                      variant="body2" 
+                                                      sx={{ 
+                                                        wordBreak: 'break-word',
+                                                        color: value ? 'text.primary' : 'text.disabled',
+                                                        fontSize: '0.8rem',
+                                                        whiteSpace: 'pre-wrap'
+                                                      }}
+                                                    >
+                                                      {value !== null && value !== undefined ? String(value) : 'N/A'}
+                                                    </Typography>
+                                                  )}
+                                                </Box>
                                               </Box>
-                                            </Box>
-                                          </Grid>
-                                        ))}
+                                            </Grid>
+                                          );
+                                        })}
                                       </Grid>
                                     </>
                                   )}
@@ -646,7 +1081,7 @@ const Onts: React.FC = () => {
                                   <Typography variant="subtitle2" gutterBottom component="div" color="primary" sx={{ mt: 1, mb: 1 }}>
                                     Status
                                   </Typography>
-                                  <Grid container spacing={1} sx={{ mb: 1 }}>
+                                  <Grid container spacing={1} sx={{ mb: 1, p: 1.5, border: 1, borderColor: 'grey.300', borderRadius: 1 }}>
                                     {['status', 'errors'].map((key) => {
                                       const value = troubleshoot[key];
                                       if (value === undefined) return null;
@@ -730,6 +1165,47 @@ const Onts: React.FC = () => {
           <Button onClick={() => setConfirmStartTroubleshoot(false)}>Cancel</Button>
           <Button onClick={handleStartTroubleshoot} variant="contained" color="primary">
             Confirm
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={jsonDialogOpen} onClose={() => setJsonDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="h6">{jsonDialogTitle}</Typography>
+            <IconButton
+              onClick={handleCopyJson}
+              size="small"
+              sx={{
+                color: copySuccess ? 'success.main' : 'primary.main',
+                '&:hover': {
+                  backgroundColor: 'action.hover',
+                }
+              }}
+              title={copySuccess ? 'Copied!' : 'Copy to clipboard'}
+            >
+              <ContentCopyIcon />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box 
+            sx={{ 
+              backgroundColor: 'grey.100', 
+              p: 2, 
+              borderRadius: 1,
+              overflow: 'auto',
+              maxHeight: '60vh'
+            }}
+          >
+            <pre style={{ margin: 0, fontSize: '0.875rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {JSON.stringify(jsonDialogContent, null, 2)}
+            </pre>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setJsonDialogOpen(false)} variant="contained">
+            Close
           </Button>
         </DialogActions>
       </Dialog>

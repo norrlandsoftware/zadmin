@@ -250,6 +250,35 @@ const Olts: React.FC = () => {
               defaultValue={editingOlt?.password || ''}
               required
             />
+            <TextField
+              margin="dense"
+              name="description"
+              label="Description"
+              type="text"
+              fullWidth
+              multiline
+              rows={3}
+              defaultValue={editingOlt?.description || ''}
+            />
+            <TextField
+              margin="dense"
+              name="logging_type"
+              label="Logging Type"
+              type="text"
+              fullWidth
+              defaultValue={editingOlt?.logging_type || 'syslog'}
+            />
+            <TextField
+              select
+              margin="dense"
+              name="enabled"
+              label="Enabled"
+              fullWidth
+              defaultValue={editingOlt?.enabled !== undefined ? String(editingOlt.enabled) : 'true'}
+            >
+              <MenuItem value="true">Yes</MenuItem>
+              <MenuItem value="false">No</MenuItem>
+            </TextField>
           </DialogContent>
           <DialogActions>
             <Button onClick={handleClose}>Cancel</Button>

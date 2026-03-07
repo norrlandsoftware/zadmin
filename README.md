@@ -44,14 +44,22 @@ npm run build
 - Configuration templates
 - API configuration
 
-
 # Docker
-## Build the image
-```bash
-docker build -t zadmin .
-```
+## Build the Docker image
+Step 1 - Create the Docker
+`docker build --platform linux/amd64/v4 -t zadmin:<VERSION> .`
 
-# Run the container
+Step 2 - Tag docker image (i.e. under the lboff account)
+`docker tag zadmin:<VERSION> lboff/zadmin:<VERSION>`
+
+Step 3 - Upload the docker image (i.e. under the lboff account)
+
+If the user is not logged in.. log in
+`docker login -u lboff`
+
+`docker push lboff/zadmin:<VERSION>`
+
+## Run the container
 ```bash
 docker run -p 3000:80 -e REACT_APP_API_URL=http://your-api-url:8000 zadmin
 ```

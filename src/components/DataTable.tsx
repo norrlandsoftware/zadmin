@@ -69,9 +69,28 @@ const DataTable: React.FC<DataTableProps> = ({
           <TableHead>
             <TableRow>
               {columns.map((column) => (
-                <TableCell key={column.id}>{column.label}</TableCell>
+                <TableCell 
+                  key={column.id}
+                  sx={{ 
+                    backgroundColor: 'primary.main', 
+                    color: 'white', 
+                    fontWeight: 600 
+                  }}
+                >
+                  {column.label}
+                </TableCell>
               ))}
-              {(onView || onEdit || onDelete || onTroubleshoot) && <TableCell>Actions</TableCell>}
+              {(onView || onEdit || onDelete || onTroubleshoot) && (
+                <TableCell 
+                  sx={{ 
+                    backgroundColor: 'primary.main', 
+                    color: 'white', 
+                    fontWeight: 600 
+                  }}
+                >
+                  Actions
+                </TableCell>
+              )}
             </TableRow>
           </TableHead>
           <TableBody>
