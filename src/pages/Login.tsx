@@ -1,19 +1,30 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  Alert,
   Box,
   Button,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   TextField,
   Typography,
   Paper,
 } from '@mui/material';
 import { useAuth } from '../contexts/AuthContext.tsx';
+import { auth } from '../services/api.ts';
 
 const Login: React.FC = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
+  const [resetError, setResetError] = useState('');
+  const [isResetSubmitting, setIsResetSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -24,6 +35,36 @@ const Login: React.FC = () => {
       navigate('/');
     } catch (err) {
       setError('Invalid username or password');
+    }
+  };
+
+  const handleForgotPasswordClose = () => {
+    setForgotPasswordOpen(false);
+    setResetEmail('');
+    setResetError('');
+    setResetMessage('');
+    setIsResetSubmitting(false);
+  };
+
+  const handleForgotPasswordSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setResetError('');
+    setResetMessage('');
+
+    if (!resetEmail) {
+      setResetError('Please enter your email.');
+      return;
+    }
+
+    setIsResetSubmitting(true);
+
+    try {
+      await auth.requestPasswordReset(resetEmail);
+    } catch (err) {
+      // Intentionally swallow backend lookup details to avoid exposing user existence.
+    } finally {
+      setResetMessage('If the user exists, you will recevie an email with the link to reset the password');
+      setIsResetSubmitting(false);
     }
   };
 
@@ -88,9 +129,58 @@ const Login: React.FC = () => {
             >
               Sign In
             </Button>
+            <Button
+              fullWidth
+              variant="text"
+              onClick={() => setForgotPasswordOpen(true)}
+            >
+              Forgot password?
+            </Button>
           </Box>
         </Paper>
       </Box>
+
+      <Dialog open={forgotPasswordOpen} onClose={handleForgotPasswordClose} fullWidth maxWidth="xs">
+        <form onSubmit={handleForgotPasswordSubmit}>
+          <DialogTitle>Forgot Password</DialogTitle>
+          <DialogContent>
+            <TextField
+              autoFocus
+              margin="dense"
+              label="Email"
+              type="email"
+              fullWidth
+              value={resetEmail}
+              onChange={(event) => setResetEmail(event.target.value)}
+              required
+            />
+            {resetError && (
+              <Alert severity="error" sx={{ mt: 2 }}>
+                {resetError}
+              </Alert>
+            )}
+            {resetMessage && (
+              <Alert severity="success" sx={{ mt: 2 }}>
+                {resetMessage}
+              </Alert>
+            )}
+          </DialogContent>
+          <DialogActions>
+            {resetMessage ? (
+              <Button onClick={handleForgotPasswordClose} variant="contained">
+                Return to Login
+              </Button>
+            ) : (
+              <>
+                <Button onClick={handleForgotPasswordClose}>Cancel</Button>
+                <Button type="submit" variant="contained" disabled={isResetSubmitting}>
+                  {isResetSubmitting ? 'Sending...' : 'Continue'}
+                </Button>
+              </>
+            )}
+          </DialogActions>
+        </form>
+      </Dialog>
     </Container>
   );
 };

@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Box,
   Button,
-  Typography,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -97,19 +96,16 @@ const Pops: React.FC = () => {
 
   if (isLoading && !data) {
     return (
-      <Layout>
+      <Layout title="Points of Presence">
         <CircularProgress />
       </Layout>
     );
   }
 
   return (
-    <Layout>
+    <Layout title="Points of Presence">
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Points of Presence
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <TextField
             placeholder="Search by Name"
             value={searchName}

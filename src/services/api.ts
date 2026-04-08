@@ -54,6 +54,17 @@ export const auth = {
     });
     return response.data;
   },
+  requestPasswordReset: async (email: string) => {
+    const response = await api.post(`/user/reset_password/${encodeURIComponent(email)}`);
+    return response.data;
+  },
+};
+
+export const appInfo = {
+  getApiInfo: async () => {
+    const response = await api.get('/');
+    return response.data;
+  },
 };
 
 // POP API
@@ -142,6 +153,46 @@ export const users = {
   },
   update: async (id: string, data: any) => {
     const response = await api.put(`/user/${id}`, data);
+    return response.data;
+  },
+  updatePassword: async (id: string, data: { password: string; reset_password_token: string }) => {
+    const response = await api.post(`/user/update_password/${id}`, data);
+    return response.data;
+  },
+};
+
+// API Config API
+export const apiConfigs = {
+  getAll: async (params?: any) => {
+    const response = await api.get('/api_config/', { params });
+    return response.data;
+  },
+  getByName: async (name: string) => {
+    const response = await api.get(`/api_config/${name}/`);
+    return response.data;
+  },
+  create: async (data: any) => {
+    const response = await api.post('/api_config/', data);
+    return response.data;
+  },
+  update: async (id: string, data: any) => {
+    const response = await api.put(`/api_config/${id}/`, data);
+    return response.data;
+  },
+};
+
+// Email Template API
+export const emailTemplates = {
+  getAll: async (params?: any) => {
+    const response = await api.get('/email_template/', { params });
+    return response.data;
+  },
+  create: async (data: any) => {
+    const response = await api.post('/email_template/', data);
+    return response.data;
+  },
+  update: async (id: string, data: any) => {
+    const response = await api.put(`/email_template/${id}/`, data);
     return response.data;
   },
 };

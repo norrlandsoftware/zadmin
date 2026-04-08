@@ -5,6 +5,7 @@ import {
   DialogContent,
   DialogActions,
   Button,
+  Checkbox,
   Typography,
   Box,
   Grid,
@@ -74,6 +75,8 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
 
   if (!data) return null;
 
+  const metadataKeys = ['id', 'created_at', 'updated_at'];
+
   const formatLabel = (key: string): string => {
     return key
       .split('_')
@@ -86,6 +89,24 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (typeof value === 'object') return JSON.stringify(value, null, 2);
     return String(value);
+  };
+
+  const formatDateValue = (value: any): string => {
+    if (!value) return 'N/A';
+
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return String(value);
+    }
+
+    return new Intl.DateTimeFormat(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).format(date);
   };
 
   // Check if latitude and longitude are valid
@@ -102,6 +123,14 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
     const otherFields = entries.filter(([key]) => key !== 'latitude' && key !== 'longitude');
     return [...otherFields, ...latLngFields];
   };
+
+  const contentEntries = reorderFields(
+    Object.entries(data).filter(([key]) => !metadataKeys.includes(key))
+  );
+
+  const metadataEntries = Object.entries(data).filter(([key]) =>
+    metadataKeys.includes(key)
+  );
 
   const renderField = (key: string, value: any) => (
     <Grid item xs={12} sm={6} key={key}>
@@ -131,15 +160,80 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
             }
           }}
         >
-          <Typography 
-            variant="body1" 
-            sx={{ 
-              wordBreak: 'break-word',
-              color: value ? 'text.primary' : 'text.disabled'
-            }}
-          >
-            {formatValue(value)}
-          </Typography>
+          {((key === 'is_active') || (key === 'enabled')) && typeof value === 'boolean' ? (
+            <Checkbox
+              checked={value}
+              disabled
+              size="small"
+              sx={{ p: 0, color: 'text.disabled' }}
+            />
+          ) : (
+            <Typography 
+              variant="body1" 
+              sx={{ 
+                wordBreak: 'break-word',
+                color: value ? 'text.primary' : 'text.disabled'
+              }}
+            >
+              {key === 'last_login' ? formatDateValue(value) : formatValue(value)}
+            </Typography>
+          )}
+        </Box>
+      </Box>
+    </Grid>
+  );
+
+  const renderObjectField = (key: string, value: Record<string, any>) => (
+    <Grid item xs={12} key={key}>
+      <Box>
+        <Typography
+          variant="caption"
+          color="primary.main"
+          sx={{
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            display: 'block',
+            mb: 0.5,
+          }}
+        >
+          {formatLabel(key)}
+        </Typography>
+        <Box
+          sx={{
+            p: 1.5,
+            border: 1,
+            borderColor: 'divider',
+            borderRadius: 1,
+          }}
+        >
+          <Grid container spacing={1.5}>
+            {Object.entries(value).length > 0 ? (
+              Object.entries(value).map(([objectKey, objectValue]) => (
+                <Grid item xs={12} sm={6} key={objectKey}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: 'block', mb: 0.25, fontWeight: 600 }}
+                  >
+                    {formatLabel(objectKey)}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ wordBreak: 'break-word', color: 'text.primary' }}
+                  >
+                    {formatValue(objectValue)}
+                  </Typography>
+                </Grid>
+              ))
+            ) : (
+              <Grid item xs={12}>
+                <Typography variant="body2" color="text.disabled">
+                  N/A
+                </Typography>
+              </Grid>
+            )}
+          </Grid>
         </Box>
       </Box>
     </Grid>
@@ -158,7 +252,11 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
           <Card variant="outlined" sx={{ mb: 2 }}>
             <CardContent>
               <Grid container spacing={3}>
-                {reorderFields(Object.entries(data)).map(([key, value]) => renderField(key, value))}
+                {contentEntries.map(([key, value]) =>
+                  key === 'config' && value && typeof value === 'object' && !Array.isArray(value)
+                    ? renderObjectField(key, value as Record<string, any>)
+                    : renderField(key, value)
+                )}
               </Grid>
               {hasValidCoordinates() && (
                 <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
@@ -174,6 +272,31 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
               )}
             </CardContent>
           </Card>
+          {metadataEntries.length > 0 && (
+            <Box sx={{ mt: 2, px: 1 }}>
+              <Grid container spacing={1.5}>
+                {metadataEntries.map(([key, value]) => (
+                  <Grid item xs={12} sm={4} key={key}>
+                    <Typography
+                      variant="caption"
+                      color="primary.main"
+                      sx={{ display: 'block', mb: 0.25, fontWeight: 600 }}
+                    >
+                      {formatLabel(key)}
+                    </Typography>
+                    <Typography
+                      variant="body2"
+                      sx={{ wordBreak: 'break-word', color: 'text.primary' }}
+                    >
+                      {key === 'created_at' || key === 'updated_at'
+                        ? formatDateValue(value)
+                        : formatValue(value)}
+                    </Typography>
+                  </Grid>
+                ))}
+              </Grid>
+            </Box>
+          )}
         </DialogContent>
         <Divider />
         <DialogActions sx={{ px: 3, py: 2 }}>

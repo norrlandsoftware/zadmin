@@ -25,14 +25,14 @@ const Dashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Layout>
+      <Layout title="Dashboard">
         <CircularProgress />
       </Layout>
     );
   }
 
   return (
-    <Layout>
+    <Layout title="Dashboard">
       <Grid container spacing={3}>
         <Grid item xs={12} md={4}>
           <Card>

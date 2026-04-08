@@ -12,6 +12,10 @@ import Pops from './pages/Pops.tsx';
 import Olts from './pages/Olts.tsx';
 import Onts from './pages/Onts.tsx';
 import Users from './pages/Users.tsx';
+import Settings from './pages/Settings.tsx';
+import EmailTemplates from './pages/EmailTemplates.tsx';
+import ResetPassword from './pages/ResetPassword.tsx';
+import About from './pages/About.tsx';
 
 const queryClient = new QueryClient();
 
@@ -34,6 +38,7 @@ const App: React.FC = () => {
           <Router>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/reset_password" element={<ResetPassword />} />
               <Route
                 path="/"
                 element={
@@ -71,6 +76,30 @@ const App: React.FC = () => {
                 element={
                   <PrivateRoute>
                     <Users />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/about/*"
+                element={
+                  <PrivateRoute>
+                    <About />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/settings/*"
+                element={
+                  <PrivateRoute>
+                    <Settings />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/email-templates/*"
+                element={
+                  <PrivateRoute>
+                    <EmailTemplates />
                   </PrivateRoute>
                 }
               />

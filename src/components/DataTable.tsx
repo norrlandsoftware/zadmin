@@ -51,6 +51,29 @@ const DataTable: React.FC<DataTableProps> = ({
   onRowClick,
   onTroubleshoot,
 }) => {
+  const hasActions = Boolean(onView || onEdit || onDelete || onTroubleshoot);
+  const actionsColumnWidth = hasActions ? 112 : 0;
+  const dataColumnWidth = hasActions
+    ? `calc((100% - ${actionsColumnWidth}px) / ${columns.length})`
+    : `${100 / columns.length}%`;
+
+  const headerCellSx = {
+    backgroundColor: 'primary.main',
+    color: 'white',
+    fontWeight: 600,
+    py: 1,
+    fontSize: '0.875rem',
+    whiteSpace: { xs: 'normal', sm: 'nowrap' },
+    overflowWrap: 'anywhere',
+  };
+
+  const bodyCellSx = {
+    py: 0.75,
+    fontSize: '0.875rem',
+    lineHeight: 1.35,
+    overflowWrap: 'anywhere',
+  };
+
   const handleChangePage = (event: unknown, newPage: number) => {
     onPageChange(newPage);
   };
@@ -65,29 +88,32 @@ const DataTable: React.FC<DataTableProps> = ({
   return (
     <Paper>
       <TableContainer>
-        <Table stickyHeader aria-label="sticky table">
+        <Table
+          stickyHeader
+          size="small"
+          aria-label="sticky table"
+          sx={{
+            width: '100%',
+            tableLayout: 'fixed',
+          }}
+        >
+          <colgroup>
+            {columns.map((column) => (
+              <col key={column.id} style={{ width: dataColumnWidth }} />
+            ))}
+            {hasActions && (
+              <col style={{ width: `${actionsColumnWidth}px` }} />
+            )}
+          </colgroup>
           <TableHead>
             <TableRow>
               {columns.map((column) => (
-                <TableCell 
-                  key={column.id}
-                  sx={{ 
-                    backgroundColor: 'primary.main', 
-                    color: 'white', 
-                    fontWeight: 600 
-                  }}
-                >
+                <TableCell key={column.id} sx={headerCellSx}>
                   {column.label}
                 </TableCell>
               ))}
-              {(onView || onEdit || onDelete || onTroubleshoot) && (
-                <TableCell 
-                  sx={{ 
-                    backgroundColor: 'primary.main', 
-                    color: 'white', 
-                    fontWeight: 600 
-                  }}
-                >
+              {hasActions && (
+                <TableCell sx={headerCellSx}>
                   Actions
                 </TableCell>
               )}
@@ -106,19 +132,27 @@ const DataTable: React.FC<DataTableProps> = ({
                 {columns.map((column) => {
                   const value = row[column.id];
                   return (
-                    <TableCell key={column.id}>
+                    <TableCell key={column.id} sx={bodyCellSx}>
                       {column.format ? column.format(value, row) : value}
                     </TableCell>
                   );
                 })}
-                {(onView || onEdit || onDelete || onTroubleshoot) && (
-                  <TableCell onClick={(e) => e.stopPropagation()}>
+                {hasActions && (
+                  <TableCell
+                    onClick={(e) => e.stopPropagation()}
+                    sx={{
+                      ...bodyCellSx,
+                      whiteSpace: 'nowrap',
+                      width: `${actionsColumnWidth}px`,
+                    }}
+                  >
                     {onView && (
                       <Tooltip title="View Details">
                         <IconButton
                           size="small"
                           onClick={() => onView(row)}
                           color="info"
+                          sx={{ p: 0.5 }}
                         >
                           <VisibilityIcon />
                         </IconButton>
@@ -130,6 +164,7 @@ const DataTable: React.FC<DataTableProps> = ({
                           size="small"
                           onClick={() => onTroubleshoot(row)}
                           color="primary"
+                          sx={{ p: 0.5 }}
                         >
                           <BuildIcon />
                         </IconButton>
@@ -141,6 +176,7 @@ const DataTable: React.FC<DataTableProps> = ({
                           size="small"
                           onClick={() => onEdit(row)}
                           color="primary"
+                          sx={{ p: 0.5 }}
                         >
                           <EditIcon />
                         </IconButton>
@@ -152,6 +188,7 @@ const DataTable: React.FC<DataTableProps> = ({
                           size="small"
                           onClick={() => onDelete(row)}
                           color="error"
+                          sx={{ p: 0.5 }}
                         >
                           <DeleteIcon />
                         </IconButton>

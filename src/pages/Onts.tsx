@@ -49,7 +49,15 @@ const columns = [
         row.operational_status?.toLowerCase() === 'configured' &&
         row.notified_to_bss === true;
       return (
-        <span style={{ color: isAllGreen ? 'green' : 'inherit' }}>
+        <span
+          style={{
+            color: isAllGreen ? 'white' : 'inherit',
+            backgroundColor: isAllGreen ? 'green' : 'transparent',
+            padding: isAllGreen ? '2px 8px' : 0,
+            borderRadius: isAllGreen ? '999px' : 0,
+            display: 'inline-block',
+          }}
+        >
           {value || 'N/A'}
         </span>
       );
@@ -64,7 +72,15 @@ const columns = [
         row.operational_status?.toLowerCase() === 'configured' &&
         row.notified_to_bss === true;
       return (
-        <span style={{ color: isAllGreen ? 'green' : 'inherit' }}>
+        <span
+          style={{
+            color: isAllGreen ? 'white' : 'inherit',
+            backgroundColor: isAllGreen ? 'green' : 'transparent',
+            padding: isAllGreen ? '2px 8px' : 0,
+            borderRadius: isAllGreen ? '999px' : 0,
+            display: 'inline-block',
+          }}
+        >
           {value || 'N/A'}
         </span>
       );
@@ -80,7 +96,15 @@ const columns = [
         row.operational_status?.toLowerCase() === 'configured' &&
         row.notified_to_bss === true;
       return (
-        <span style={{ color: isAllGreen ? 'green' : 'inherit' }}>
+        <span
+          style={{
+            color: isAllGreen ? 'white' : 'inherit',
+            backgroundColor: isAllGreen ? 'green' : 'transparent',
+            padding: isAllGreen ? '2px 8px' : 0,
+            borderRadius: isAllGreen ? '999px' : 0,
+            display: 'inline-block',
+          }}
+        >
           {displayValue}
         </span>
       );
@@ -236,19 +260,16 @@ const Onts: React.FC = () => {
 
   if (isLoading && !data) {
     return (
-      <Layout>
+      <Layout title="Optical Network Terminals">
         <CircularProgress />
       </Layout>
     );
   }
 
   return (
-    <Layout>
+    <Layout title="Optical Network Terminals">
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Optical Network Terminals
-        </Typography>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <TextField
             placeholder="Search by Serial Number"
             value={searchSerial}

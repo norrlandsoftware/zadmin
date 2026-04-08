@@ -3,22 +3,25 @@ import { useQuery } from '@tanstack/react-query';
 import {
   Box,
   Button,
-  Typography,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
   TextField,
   CircularProgress,
+  MenuItem,
 } from '@mui/material';
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
 import { users } from '../services/api.ts';
 
+const availableRoles = ['admin', 'bss', 'discoverer'];
+
 const columns = [
-  { id: 'username', label: 'Username' },
+  { id: 'full_name', label: 'Full Name', format: (value: string) => value || 'N/A' },
   { id: 'email', label: 'Email' },
+  { id: 'role', label: 'Role', format: (value: string) => value || 'N/A' },
   { id: 'is_active', label: 'Active', format: (value: boolean) => value ? 'Yes' : 'No' },
 ];
 
@@ -55,12 +58,17 @@ const Users: React.FC = () => {
     event.preventDefault();
     const formData = new FormData(event.target as HTMLFormElement);
     const data = Object.fromEntries(formData.entries());
+    const payload = {
+      full_name: data.full_name,
+      email: data.email,
+      role: data.role || null,
+    };
 
     try {
       if (editingUser) {
-        await users.update(editingUser.id, data);
+        await users.update(editingUser.id, payload);
       } else {
-        await users.create(data);
+        await users.create(payload);
       }
       refetch();
       handleClose();
@@ -71,18 +79,15 @@ const Users: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Layout>
+      <Layout title="Users">
         <CircularProgress />
       </Layout>
     );
   }
 
   return (
-    <Layout>
+    <Layout title="Users">
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" component="h1" gutterBottom>
-          Users
-        </Typography>
         <Button
           variant="contained"
           color="primary"
@@ -113,11 +118,11 @@ const Users: React.FC = () => {
             <TextField
               autoFocus
               margin="dense"
-              name="username"
-              label="Username"
+              name="full_name"
+              label="Full Name"
               type="text"
               fullWidth
-              defaultValue={editingUser?.username || ''}
+              defaultValue={editingUser?.full_name || ''}
               required
             />
             <TextField
@@ -130,14 +135,20 @@ const Users: React.FC = () => {
               required
             />
             <TextField
+              select
               margin="dense"
-              name="password"
-              label="Password"
-              type="password"
+              name="role"
+              label="Role"
               fullWidth
-              defaultValue=""
-              required={!editingUser}
-            />
+              defaultValue={editingUser?.role || ''}
+              required
+            >
+              {availableRoles.map((role) => (
+                <MenuItem key={role} value={role}>
+                  {role}
+                </MenuItem>
+              ))}
+            </TextField>
           </DialogContent>
           <DialogActions>
             <Button onClick={handleClose}>Cancel</Button>
