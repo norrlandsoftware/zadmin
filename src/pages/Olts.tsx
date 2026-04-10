@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -12,9 +13,13 @@ import {
   MenuItem,
   InputAdornment,
   IconButton,
+  Typography,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
@@ -36,6 +41,10 @@ const Olts: React.FC = () => {
   const [viewingOlt, setViewingOlt] = useState<any>(null);
   const [searchName, setSearchName] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [showUsername, setShowUsername] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Debounce search input
   useEffect(() => {
@@ -59,6 +68,31 @@ const Olts: React.FC = () => {
   );
 
   const { data: popsData } = useQuery(['pops'], () => pops.getAll());
+
+  useEffect(() => {
+    const openOltId = location.state?.openOltId;
+
+    if (!openOltId || !data?.data) {
+      return;
+    }
+
+    const matchedOlt = data.data.find((olt: any) => olt.id === openOltId);
+    if (!matchedOlt) {
+      return;
+    }
+
+    const popName = popsData?.data.find((pop: any) => pop.id === matchedOlt.pop_id)?.name;
+    const oltWithPopName = {
+      ...matchedOlt,
+      pop_name: popName || 'N/A',
+    };
+
+    delete oltWithPopName.pop_id;
+
+    setViewingOlt(oltWithPopName);
+    setDetailDialogOpen(true);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [data, location.pathname, location.state, navigate, popsData]);
 
   const handleView = (olt: any) => {
     // Find the POP name from the popsData
@@ -85,6 +119,8 @@ const Olts: React.FC = () => {
   const handleClose = () => {
     setDialogOpen(false);
     setEditingOlt(null);
+    setShowUsername(false);
+    setShowPassword(false);
   };
 
   const handleSave = async (event: React.FormEvent) => {
@@ -228,24 +264,57 @@ const Olts: React.FC = () => {
                 </MenuItem>
               ))}
             </TextField>
-            <TextField
-              margin="dense"
-              name="username"
-              label="Username"
-              type="text"
-              fullWidth
-              defaultValue={editingOlt?.username || ''}
-              required
-            />
-            <TextField
-              margin="dense"
-              name="password"
-              label="Password"
-              type="password"
-              fullWidth
-              defaultValue={editingOlt?.password || ''}
-              required
-            />
+            <Box sx={{ mt: 2, mb: 1 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                Credentials
+              </Typography>
+              <TextField
+                margin="dense"
+                name="username"
+                label="Username"
+                type={showUsername ? 'text' : 'password'}
+                fullWidth
+                defaultValue={editingOlt?.username || ''}
+                required
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label={showUsername ? 'Hide username' : 'Show username'}
+                        onClick={() => setShowUsername((prev) => !prev)}
+                        onMouseDown={(event) => event.preventDefault()}
+                        edge="end"
+                      >
+                        {showUsername ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+              <TextField
+                margin="dense"
+                name="password"
+                label="Password"
+                type={showPassword ? 'text' : 'password'}
+                fullWidth
+                defaultValue={editingOlt?.password || ''}
+                required
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        onClick={() => setShowPassword((prev) => !prev)}
+                        onMouseDown={(event) => event.preventDefault()}
+                        edge="end"
+                      >
+                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Box>
             <TextField
               margin="dense"
               name="description"
@@ -290,6 +359,28 @@ const Olts: React.FC = () => {
         onClose={() => setDetailDialogOpen(false)}
         title="OLT Details"
         data={viewingOlt}
+        fieldActions={
+          viewingOlt?.pop_name && viewingOlt?.pop_name !== 'N/A'
+            ? {
+                pop_name: {
+                  icon: <OpenInNewIcon fontSize="small" />,
+                  label: 'Open POP details',
+                  onClick: () => {
+                    const targetOlt = data?.data.find((olt: any) => olt.id === viewingOlt.id);
+                    const targetPop = popsData?.data.find((pop: any) => pop.id === targetOlt?.pop_id);
+
+                    setDetailDialogOpen(false);
+                    navigate('/pops', {
+                      state: {
+                        openPopId: targetOlt?.pop_id,
+                        openPopData: targetPop,
+                      },
+                    });
+                  },
+                },
+              }
+            : undefined
+        }
       />
     </Layout>
   );

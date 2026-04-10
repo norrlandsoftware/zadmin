@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -39,6 +40,8 @@ const Pops: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [searchName, setSearchName] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Debounce search input
   useEffect(() => {
@@ -60,6 +63,33 @@ const Pops: React.FC = () => {
       keepPreviousData: true,
     }
   );
+
+  useEffect(() => {
+    const openPopId = location.state?.openPopId;
+    const openPopData = location.state?.openPopData;
+
+    if (openPopData) {
+      setTabValue(0);
+      setViewingPop(openPopData);
+      setDetailDialogOpen(true);
+      navigate(location.pathname, { replace: true, state: {} });
+      return;
+    }
+
+    if (!openPopId || !data?.data) {
+      return;
+    }
+
+    const matchedPop = data.data.find((pop: any) => pop.id === openPopId);
+    if (!matchedPop) {
+      return;
+    }
+
+    setTabValue(0);
+    setViewingPop(matchedPop);
+    setDetailDialogOpen(true);
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [data, location.pathname, location.state, navigate]);
 
   const handleView = (pop: any) => {
     setViewingPop(pop);

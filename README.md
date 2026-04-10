@@ -61,5 +61,5 @@ If the user is not logged in.. log in
 
 ## Run the container
 ```bash
-docker run -p 3000:80 -e REACT_APP_API_URL=http://your-api-url:8000 zadmin
+docker run -p 3000:80 -e REACT_APP_API_URL=http://your-api-url:8000 -d zadmin
 ```

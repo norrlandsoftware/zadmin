@@ -12,24 +12,27 @@ import {
   Card,
   CardContent,
   Divider,
+  IconButton,
 } from '@mui/material';
 import MapIcon from '@mui/icons-material/Map';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
+import Visibility from '@mui/icons-material/Visibility';
+import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import PopMap from './PopMap.tsx';
 
-// Fix for default marker icon
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-});
+interface DetailDialogFieldAction {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+}
 
 interface DetailDialogProps {
   open: boolean;
   onClose: () => void;
   title: string;
   data: any;
+  fieldActions?: Record<string, DetailDialogFieldAction>;
+  fullWidthFields?: string[];
+  htmlPreviewFields?: string[];
 }
 
 const DetailDialog: React.FC<DetailDialogProps> = ({
@@ -37,41 +40,22 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   onClose,
   title,
   data,
+  fieldActions,
+  fullWidthFields = [],
+  htmlPreviewFields = [],
 }) => {
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
-  const mapContainerRef = React.useRef<HTMLDivElement>(null);
-  const mapRef = React.useRef<L.Map | null>(null);
+  const [showUsername, setShowUsername] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [visibleConfigSecrets, setVisibleConfigSecrets] = useState<Record<string, boolean>>({});
 
-  // Initialize map when map dialog opens
   React.useEffect(() => {
-    if (mapDialogOpen && mapContainerRef.current && !mapRef.current && data) {
-      const lat = parseFloat(data.latitude);
-      const lng = parseFloat(data.longitude);
-      
-      mapRef.current = L.map(mapContainerRef.current).setView([lat, lng], 13);
-
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors',
-        maxZoom: 19,
-      }).addTo(mapRef.current);
-
-      L.marker([lat, lng])
-        .addTo(mapRef.current)
-        .bindPopup(
-          `<strong>${data.name || 'Location'}</strong><br/>
-          ${data.address || ''}<br/>
-          ${data.city || ''}, ${data.country || ''}`
-        )
-        .openPopup();
+    if (!open) {
+      setShowUsername(false);
+      setShowPassword(false);
+      setVisibleConfigSecrets({});
     }
-
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-    };
-  }, [mapDialogOpen, data]);
+  }, [open, data]);
 
   if (!data) return null;
 
@@ -125,15 +109,33 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   };
 
   const contentEntries = reorderFields(
-    Object.entries(data).filter(([key]) => !metadataKeys.includes(key))
+    Object.entries(data).filter(([key]) =>
+      !metadataKeys.includes(key) && key !== 'username' && key !== 'password'
+    )
+  );
+
+  const credentialsEntries = Object.entries(data).filter(([key]) =>
+    key === 'username' || key === 'password'
   );
 
   const metadataEntries = Object.entries(data).filter(([key]) =>
     metadataKeys.includes(key)
   );
 
+  const mapPop = hasValidCoordinates()
+    ? [{
+        id: String(data.id ?? data.name ?? 'location'),
+        name: data.name || 'Location',
+        latitude: parseFloat(data.latitude),
+        longitude: parseFloat(data.longitude),
+        address: data.address,
+        city: data.city,
+        country: data.country,
+      }]
+    : [];
+
   const renderField = (key: string, value: any) => (
-    <Grid item xs={12} sm={6} key={key}>
+    <Grid item xs={12} sm={fullWidthFields.includes(key) ? 12 : 6} key={key}>
       <Box>
         <Typography 
           variant="caption" 
@@ -168,15 +170,51 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
               sx={{ p: 0, color: 'text.disabled' }}
             />
           ) : (
-            <Typography 
-              variant="body1" 
-              sx={{ 
-                wordBreak: 'break-word',
-                color: value ? 'text.primary' : 'text.disabled'
-              }}
-            >
-              {key === 'last_login' ? formatDateValue(value) : formatValue(value)}
-            </Typography>
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
+                <Typography 
+                  variant="body1" 
+                  sx={{ 
+                    wordBreak: 'break-word',
+                    color: value ? 'text.primary' : 'text.disabled',
+                    flex: 1,
+                  }}
+                >
+                  {key === 'last_login' ? formatDateValue(value) : formatValue(value)}
+                </Typography>
+                {fieldActions?.[key] && (
+                  <IconButton
+                    size="small"
+                    aria-label={fieldActions[key].label}
+                    onClick={fieldActions[key].onClick}
+                  >
+                    {fieldActions[key].icon}
+                  </IconButton>
+                )}
+              </Box>
+              {htmlPreviewFields.includes(key) && typeof value === 'string' && value.trim() && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ display: 'block', mb: 0.75, fontWeight: 600 }}
+                  >
+                    Body View
+                  </Typography>
+                  <Box
+                    sx={{
+                      p: 2,
+                      border: 1,
+                      borderColor: 'divider',
+                      borderRadius: 1,
+                      bgcolor: 'background.default',
+                      overflow: 'auto',
+                    }}
+                    dangerouslySetInnerHTML={{ __html: value }}
+                  />
+                </Box>
+              )}
+            </Box>
           )}
         </Box>
       </Box>
@@ -209,23 +247,72 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
         >
           <Grid container spacing={1.5}>
             {Object.entries(value).length > 0 ? (
-              Object.entries(value).map(([objectKey, objectValue]) => (
-                <Grid item xs={12} sm={6} key={objectKey}>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    sx={{ display: 'block', mb: 0.25, fontWeight: 600 }}
-                  >
-                    {formatLabel(objectKey)}
-                  </Typography>
-                  <Typography
-                    variant="body2"
-                    sx={{ wordBreak: 'break-word', color: 'text.primary' }}
-                  >
-                    {formatValue(objectValue)}
-                  </Typography>
-                </Grid>
-              ))
+              Object.entries(value).map(([objectKey, objectValue]) => {
+                const normalizedKey = objectKey.replace(/[\s_]/g, '').toLowerCase();
+                const isSensitiveConfigField =
+                  key === 'config' &&
+                  (normalizedKey === 'password' || normalizedKey === 'apikey');
+                const visibilityKey = `${key}.${objectKey}`;
+                const isVisible = !!visibleConfigSecrets[visibilityKey];
+
+                return (
+                  <Grid item xs={12} sm={6} key={objectKey}>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      sx={{ display: 'block', mb: 0.25, fontWeight: 600 }}
+                    >
+                      {formatLabel(objectKey)}
+                    </Typography>
+                    {isSensitiveConfigField ? (
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 1,
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{ wordBreak: 'break-word', color: 'text.primary', flex: 1 }}
+                        >
+                          {isVisible
+                            ? formatValue(objectValue)
+                            : objectValue !== null && objectValue !== undefined && objectValue !== ''
+                              ? '••••••••'
+                              : 'N/A'}
+                        </Typography>
+                        {(objectValue !== null && objectValue !== undefined && objectValue !== '') && (
+                          <IconButton
+                            size="small"
+                            aria-label={isVisible ? `Hide ${formatLabel(objectKey)}` : `Show ${formatLabel(objectKey)}`}
+                            onClick={() =>
+                              setVisibleConfigSecrets((prev) => ({
+                                ...prev,
+                                [visibilityKey]: !prev[visibilityKey],
+                              }))
+                            }
+                          >
+                            {isVisible ? (
+                              <VisibilityOff fontSize="small" />
+                            ) : (
+                              <Visibility fontSize="small" />
+                            )}
+                          </IconButton>
+                        )}
+                      </Box>
+                    ) : (
+                      <Typography
+                        variant="body2"
+                        sx={{ wordBreak: 'break-word', color: 'text.primary' }}
+                      >
+                        {formatValue(objectValue)}
+                      </Typography>
+                    )}
+                  </Grid>
+                );
+              })
             ) : (
               <Grid item xs={12}>
                 <Typography variant="body2" color="text.disabled">
@@ -234,6 +321,67 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
               </Grid>
             )}
           </Grid>
+        </Box>
+      </Box>
+    </Grid>
+  );
+
+  const renderSensitiveField = (
+    key: 'username' | 'password',
+    value: any,
+    visible: boolean,
+    onToggle: () => void
+  ) => (
+    <Grid item xs={12} sm={6} key={key}>
+      <Box>
+        <Typography
+          variant="caption"
+          color="primary.main"
+          sx={{
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            display: 'block',
+            mb: 0.5,
+          }}
+        >
+          {formatLabel(key)}
+        </Typography>
+        <Box
+          sx={{
+            p: 1,
+            border: 1,
+            borderColor: 'divider',
+            borderRadius: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 1,
+            transition: 'border-color 0.2s',
+            '&:hover': {
+              borderColor: 'primary.main',
+            },
+          }}
+        >
+          <Typography
+            variant="body1"
+            sx={{
+              wordBreak: 'break-word',
+              color: value ? 'text.primary' : 'text.disabled',
+              flex: 1,
+            }}
+          >
+            {visible ? formatValue(value) : value ? '••••••••' : 'N/A'}
+          </Typography>
+          {!!value && (
+            <IconButton
+              size="small"
+              aria-label={visible ? `Hide ${key}` : `Show ${key}`}
+              onClick={onToggle}
+            >
+              {visible ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+            </IconButton>
+          )}
         </Box>
       </Box>
     </Grid>
@@ -256,6 +404,26 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
                   key === 'config' && value && typeof value === 'object' && !Array.isArray(value)
                     ? renderObjectField(key, value as Record<string, any>)
                     : renderField(key, value)
+                )}
+                {credentialsEntries.length > 0 && (
+                  <Grid item xs={12}>
+                    <Box sx={{ mt: 1 }}>
+                      <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                        Credentials
+                      </Typography>
+                      <Grid container spacing={3}>
+                        {credentialsEntries.map(([key, value]) =>
+                          key === 'username'
+                            ? renderSensitiveField('username', value, showUsername, () =>
+                                setShowUsername((prev) => !prev)
+                              )
+                            : renderSensitiveField('password', value, showPassword, () =>
+                                setShowPassword((prev) => !prev)
+                              )
+                        )}
+                      </Grid>
+                    </Box>
+                  </Grid>
                 )}
               </Grid>
               {hasValidCoordinates() && (
@@ -311,14 +479,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
           {data.name || 'Location'} - Map View
         </DialogTitle>
         <DialogContent>
-          <Box
-            ref={mapContainerRef}
-            sx={{
-              height: '500px',
-              width: '100%',
-              borderRadius: 1,
-            }}
-          />
+          <PopMap pops={mapPop} />
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setMapDialogOpen(false)} variant="contained">

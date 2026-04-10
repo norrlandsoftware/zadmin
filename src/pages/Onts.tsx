@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Button,
@@ -30,6 +31,7 @@ import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
@@ -112,6 +114,14 @@ const columns = [
   },
 ];
 
+const formatOpticalMetric = (value: any): string => {
+  if (value === null || value === undefined || value === '') {
+    return 'N/A';
+  }
+
+  return String(value);
+};
+
 const Onts: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -130,6 +140,7 @@ const Onts: React.FC = () => {
   const [jsonDialogContent, setJsonDialogContent] = useState<any>(null);
   const [jsonDialogTitle, setJsonDialogTitle] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
+  const navigate = useNavigate();
 
   // Debounce search input
   useEffect(() => {
@@ -382,6 +393,22 @@ const Onts: React.FC = () => {
         onClose={() => setDetailDialogOpen(false)}
         title="ONT Details"
         data={viewingOnt}
+        fieldActions={
+          viewingOnt?.olt_name && viewingOnt?.olt_name !== 'N/A'
+            ? {
+                olt_name: {
+                  icon: <OpenInNewIcon fontSize="small" />,
+                  label: 'Open OLT details',
+                  onClick: () => {
+                    setDetailDialogOpen(false);
+                    navigate('/olts', {
+                      state: { openOltId: data?.data.find((ont: any) => ont.id === viewingOnt.id)?.olt_id },
+                    });
+                  },
+                },
+              }
+            : undefined
+        }
       />
 
       <Dialog open={troubleshootDialogOpen} onClose={() => setTroubleshootDialogOpen(false)} maxWidth="lg" fullWidth>
@@ -597,55 +624,210 @@ const Onts: React.FC = () => {
                                   <Typography variant="subtitle2" gutterBottom component="div" color="primary" sx={{ mt: 1, mb: 1 }}>
                                     Optical
                                   </Typography>
-                                  <Grid container spacing={1} sx={{ mb: 2, p: 1.5, border: 1, borderColor: 'grey.300', borderRadius: 1 }}>
-                                    {['distance', 'olt_rx_level', 'ont_rx_level', 'ont_tx_level', 'expected_loss', 'actual_loss', 'margin', 'link_quality'].map((key) => {
-                                      const value = troubleshoot[key];
-                                      if (value === undefined) return null;
-                                      return (
-                                        <Grid item xs={12} sm={6} md={3} key={key}>
-                                          <Box>
-                                            <Typography 
-                                              variant="caption" 
-                                              color="primary.main"
-                                              sx={{ 
-                                                fontWeight: 600, 
-                                                textTransform: 'uppercase',
-                                                letterSpacing: 0.5,
-                                                display: 'block',
-                                                mb: 0.3,
-                                                fontSize: '0.7rem'
-                                              }}
-                                            >
-                                              {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-                                            </Typography>
-                                            <Box 
-                                              sx={{ 
-                                                p: 0.5,
-                                                border: 1,
-                                                borderColor: 'divider',
-                                                borderRadius: 1,
-                                                transition: 'border-color 0.2s',
-                                                '&:hover': {
-                                                  borderColor: 'primary.main',
-                                                }
-                                              }}
-                                            >
+                                  <Box sx={{ mb: 2, p: 1.5, border: 1, borderColor: 'grey.300', borderRadius: 1 }}>
+                                    <Grid container spacing={1}>
+                                      {['distance', 'olt_rx_level', 'ont_rx_level', 'ont_tx_level', 'expected_loss', 'actual_loss', 'margin', 'link_quality'].map((key) => {
+                                        const value = troubleshoot[key];
+                                        if (value === undefined) return null;
+                                        return (
+                                          <Grid item xs={12} sm={6} md={3} key={key}>
+                                            <Box>
                                               <Typography 
-                                                variant="body2" 
+                                                variant="caption" 
+                                                color="primary.main"
                                                 sx={{ 
-                                                  wordBreak: 'break-word',
-                                                  color: value ? 'text.primary' : 'text.disabled',
-                                                  fontSize: '0.8rem'
+                                                  fontWeight: 600, 
+                                                  textTransform: 'uppercase',
+                                                  letterSpacing: 0.5,
+                                                  display: 'block',
+                                                  mb: 0.3,
+                                                  fontSize: '0.7rem'
                                                 }}
                                               >
-                                                {value !== null && value !== undefined ? String(value) : 'N/A'}
+                                                {key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                                               </Typography>
+                                              <Box 
+                                                sx={{ 
+                                                  p: 0.5,
+                                                  border: 1,
+                                                  borderColor: 'divider',
+                                                  borderRadius: 1,
+                                                  transition: 'border-color 0.2s',
+                                                  '&:hover': {
+                                                    borderColor: 'primary.main',
+                                                  }
+                                                }}
+                                              >
+                                                <Typography 
+                                                  variant="body2" 
+                                                  sx={{ 
+                                                    wordBreak: 'break-word',
+                                                    color: value ? 'text.primary' : 'text.disabled',
+                                                    fontSize: '0.8rem'
+                                                  }}
+                                                >
+                                                  {value !== null && value !== undefined ? String(value) : 'N/A'}
+                                                </Typography>
+                                              </Box>
                                             </Box>
-                                          </Box>
-                                        </Grid>
-                                      );
-                                    })}
-                                  </Grid>
+                                          </Grid>
+                                        );
+                                      })}
+                                    </Grid>
+
+                                    {(troubleshoot.olt_rx_level !== undefined ||
+                                      troubleshoot.ont_rx_level !== undefined ||
+                                      troubleshoot.ont_tx_level !== undefined ||
+                                      troubleshoot.actual_loss !== undefined ||
+                                      troubleshoot.expected_loss !== undefined) && (
+                                      <Box
+                                        sx={{
+                                          mt: 1.5,
+                                          pt: 1.5,
+                                          borderTop: 1,
+                                          borderColor: 'divider',
+                                          overflowX: 'auto',
+                                        }}
+                                      >
+                                        <Box
+                                          sx={{
+                                            position: 'relative',
+                                            minWidth: 440,
+                                            maxWidth: 520,
+                                            height: 132,
+                                            mx: 'auto',
+                                          }}
+                                        >
+                                        <Box
+                                          sx={{
+                                            position: 'absolute',
+                                            left: 0,
+                                            top: 22,
+                                            width: 96,
+                                            height: 88,
+                                            border: 1.5,
+                                            borderColor: 'primary.main',
+                                            borderRadius: 3,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            bgcolor: 'background.paper',
+                                          }}
+                                        >
+                                          <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'primary.main', position: 'absolute', top: 16, right: 10 }}>
+                                            TX
+                                          </Typography>
+                                          <Typography sx={{ fontSize: '1.05rem', lineHeight: 1, fontWeight: 600 }}>
+                                            OLT
+                                          </Typography>
+                                          <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'primary.main', position: 'absolute', bottom: 16, right: 10 }}>
+                                            RX
+                                          </Typography>
+                                        </Box>
+
+                                        <Box
+                                          sx={{
+                                            position: 'absolute',
+                                            right: 0,
+                                            top: 22,
+                                            width: 96,
+                                            height: 88,
+                                            border: 1.5,
+                                            borderColor: 'primary.main',
+                                            borderRadius: 3,
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                            bgcolor: 'background.paper',
+                                          }}
+                                        >
+                                          <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'primary.main', position: 'absolute', top: 16, left: 10 }}>
+                                            RX
+                                          </Typography>
+                                          <Typography sx={{ fontSize: '1.05rem', lineHeight: 1, fontWeight: 600 }}>
+                                            ONT
+                                          </Typography>
+                                          <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: 'primary.main', position: 'absolute', bottom: 16, left: 10 }}>
+                                            TX
+                                          </Typography>
+                                        </Box>
+
+                                        <Box
+                                          sx={{
+                                            position: 'absolute',
+                                            left: 94,
+                                            right: 94,
+                                            top: 48,
+                                            height: 2,
+                                            bgcolor: 'primary.main',
+                                          }}
+                                        />
+                                        <Box
+                                          sx={{
+                                            position: 'absolute',
+                                            left: 94,
+                                            right: 94,
+                                            top: 82,
+                                            height: 2,
+                                            bgcolor: 'primary.main',
+                                          }}
+                                        />
+
+                                        <Typography
+                                          sx={{
+                                            position: 'absolute',
+                                            top: 16,
+                                            right: 112,
+                                            fontSize: '0.8rem',
+                                            fontWeight: 700,
+                                            color: 'error.main',
+                                          }}
+                                        >
+                                          {formatOpticalMetric(troubleshoot.ont_rx_level)}
+                                        </Typography>
+                                        <Typography
+                                          sx={{
+                                            position: 'absolute',
+                                            top: 64,
+                                            left: '50%',
+                                            transform: 'translateX(-50%)',
+                                            fontSize: '0.8rem',
+                                            fontWeight: 700,
+                                            color: 'error.main',
+                                          }}
+                                        >
+                                          {formatOpticalMetric(troubleshoot.actual_loss ?? troubleshoot.expected_loss)}
+                                        </Typography>
+                                        <Typography
+                                          sx={{
+                                            position: 'absolute',
+                                            top: 88,
+                                            left: 102,
+                                            fontSize: '0.8rem',
+                                            fontWeight: 700,
+                                            color: 'error.main',
+                                          }}
+                                        >
+                                          {formatOpticalMetric(troubleshoot.olt_rx_level)}
+                                        </Typography>
+                                        <Typography
+                                          sx={{
+                                            position: 'absolute',
+                                            top: 88,
+                                            right: 112,
+                                            fontSize: '0.8rem',
+                                            fontWeight: 700,
+                                            color: 'error.main',
+                                          }}
+                                        >
+                                          {formatOpticalMetric(troubleshoot.ont_tx_level)}
+                                        </Typography>
+                                        </Box>
+                                      </Box>
+                                    )}
+                                  </Box>
 
                                   {/* Radius Section */}
                                   {troubleshoot.radius && (

@@ -213,6 +213,8 @@ const EmailTemplates: React.FC = () => {
         onClose={() => setDetailDialogOpen(false)}
         title="Email Template Details"
         data={viewingTemplate}
+        fullWidthFields={['body']}
+        htmlPreviewFields={['body']}
       />
     </Layout>
   );

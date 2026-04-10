@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
+  Alert,
   Box,
   Button,
   Dialog,
@@ -32,6 +33,8 @@ const Users: React.FC = () => {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<any>(null);
   const [viewingUser, setViewingUser] = useState<any>(null);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const { data, isLoading, refetch } = useQuery(['users', page, rowsPerPage], () =>
     users.getAll({ page: page + 1, size: rowsPerPage })
@@ -46,16 +49,20 @@ const Users: React.FC = () => {
 
   const handleEdit = (user: any) => {
     setEditingUser(user);
+    setFormError(null);
     setDialogOpen(true);
   };
 
   const handleClose = () => {
     setDialogOpen(false);
     setEditingUser(null);
+    setFormError(null);
   };
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
+    setFormError(null);
+    setSuccessMessage(null);
     const formData = new FormData(event.target as HTMLFormElement);
     const data = Object.fromEntries(formData.entries());
     const payload = {
@@ -69,11 +76,16 @@ const Users: React.FC = () => {
         await users.update(editingUser.id, payload);
       } else {
         await users.create(payload);
+        setSuccessMessage('The user has been created and a welcome email has been sent to the new user');
       }
       refetch();
       handleClose();
-    } catch (error) {
-      console.error('Error saving user:', error);
+    } catch (error: any) {
+      setFormError(
+        error?.response?.data?.detail?.[0]?.msg ||
+          error?.response?.data?.message ||
+          'Unable to save user.'
+      );
     }
   };
 
@@ -115,6 +127,11 @@ const Users: React.FC = () => {
             {editingUser ? 'Edit User' : 'Create New User'}
           </DialogTitle>
           <DialogContent>
+            {formError && (
+              <Alert severity="error" sx={{ mb: 2, mt: 1 }}>
+                {formError}
+              </Alert>
+            )}
             <TextField
               autoFocus
               margin="dense"
@@ -157,6 +174,20 @@ const Users: React.FC = () => {
             </Button>
           </DialogActions>
         </form>
+      </Dialog>
+
+      <Dialog open={!!successMessage} onClose={() => setSuccessMessage(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>User Created</DialogTitle>
+        <DialogContent>
+          <Alert severity="success" sx={{ mt: 1 }}>
+            {successMessage}
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSuccessMessage(null)} variant="contained">
+            Close
+          </Button>
+        </DialogActions>
       </Dialog>
 
       <DetailDialog
