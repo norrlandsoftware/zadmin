@@ -22,12 +22,14 @@ import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
 import PopMap from '../components/PopMap.tsx';
 import { pops } from '../services/api.ts';
+import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
 const columns = [
   { id: 'name', label: 'Name' },
   { id: 'address', label: 'Address' },
   { id: 'city', label: 'City' },
   { id: 'country', label: 'Country' },
+  { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
 ];
 
 const Pops: React.FC = () => {
@@ -57,6 +59,7 @@ const Pops: React.FC = () => {
     () => pops.getAll({ 
       page: page + 1, 
       size: rowsPerPage,
+      sort: UPDATED_AT_DESC_SORT,
       ...(debouncedSearch && { q: `name[regex]:${debouncedSearch}` })
     }),
     {

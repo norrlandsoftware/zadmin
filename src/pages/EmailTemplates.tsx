@@ -18,6 +18,7 @@ import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
 import { emailTemplates } from '../services/api.ts';
+import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
 const templateTypes = ['new_user', 'reset_password', 'generic'];
 
@@ -30,6 +31,7 @@ const columns = [
     label: 'Active',
     format: (value: boolean) => (value ? 'Yes' : 'No'),
   },
+  { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
 ];
 
 const EmailTemplates: React.FC = () => {
@@ -43,7 +45,7 @@ const EmailTemplates: React.FC = () => {
 
   const { data, isLoading, refetch } = useQuery(
     ['email-templates', page, rowsPerPage],
-    () => emailTemplates.getAll({ page: page + 1, size: rowsPerPage })
+    () => emailTemplates.getAll({ page: page + 1, size: rowsPerPage, sort: UPDATED_AT_DESC_SORT })
   );
 
   const openCreateDialog = () => {

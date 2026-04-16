@@ -105,12 +105,30 @@ export const olts = {
     const response = await api.put(`/olt/${id}`, data);
     return response.data;
   },
+  isReachable: async (id: string) => {
+    const response = await api.get(`/olt/${id}/is_reachable`);
+    return response.data;
+  },
 };
 
 // ONT API
 export const onts = {
   getAll: async (params?: any) => {
-    const response = await api.get('/ont/', { params });
+    const response = await api.get('/ont/', {
+      params,
+      paramsSerializer: {
+        indexes: null,
+      },
+    });
+    return response.data;
+  },
+  getNotFullyConfigured: async (params?: any) => {
+    const response = await api.get('/ont/not_fully_configured', {
+      params,
+      paramsSerializer: {
+        indexes: null,
+      },
+    });
     return response.data;
   },
   getById: async (id: string) => {

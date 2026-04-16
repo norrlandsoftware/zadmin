@@ -14,6 +14,8 @@ import {
   InputAdornment,
   IconButton,
   Typography,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
@@ -24,12 +26,14 @@ import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
 import { olts, pops } from '../services/api.ts';
+import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
 const columns = [
   { id: 'name', label: 'Name' },
   { id: 'vendor', label: 'Vendor' },
   { id: 'model', label: 'Model' },
   { id: 'ip_address_v4', label: 'IP Address' },
+  { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
 ];
 
 const Olts: React.FC = () => {
@@ -43,6 +47,9 @@ const Olts: React.FC = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [showUsername, setShowUsername] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [testingOlt, setTestingOlt] = useState(false);
+  const [reachabilityMessage, setReachabilityMessage] = useState('');
+  const [reachabilitySeverity, setReachabilitySeverity] = useState<'success' | 'error'>('success');
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -60,6 +67,7 @@ const Olts: React.FC = () => {
     () => olts.getAll({ 
       page: page + 1, 
       size: rowsPerPage,
+      sort: UPDATED_AT_DESC_SORT,
       ...(debouncedSearch && { q: `name[regex]:${debouncedSearch}` })
     }),
     {
@@ -138,6 +146,33 @@ const Olts: React.FC = () => {
       handleClose();
     } catch (error) {
       console.error('Error saving OLT:', error);
+    }
+  };
+
+  const handleTestReachability = async () => {
+    if (!viewingOlt?.id) {
+      return;
+    }
+
+    setTestingOlt(true);
+
+    try {
+      const result = await olts.isReachable(viewingOlt.id);
+      const reachable = Boolean(result.reachable);
+      const oltName = viewingOlt.name || 'selected OLT';
+
+      setReachabilityMessage(
+        reachable
+          ? `The OLT ${oltName} is reachable`
+          : `The OLT ${oltName} is NOT reachable`
+      );
+      setReachabilitySeverity(reachable ? 'success' : 'error');
+    } catch (error) {
+      console.error('Error testing OLT reachability:', error);
+      setReachabilityMessage(`Unable to test OLT ${viewingOlt.name || 'selected OLT'}`);
+      setReachabilitySeverity('error');
+    } finally {
+      setTestingOlt(false);
     }
   };
 
@@ -359,6 +394,15 @@ const Olts: React.FC = () => {
         onClose={() => setDetailDialogOpen(false)}
         title="OLT Details"
         data={viewingOlt}
+        actions={
+          <Button
+            onClick={handleTestReachability}
+            disabled={testingOlt || !viewingOlt?.id}
+            variant="outlined"
+          >
+            {testingOlt ? 'Testing...' : 'Test'}
+          </Button>
+        }
         fieldActions={
           viewingOlt?.pop_name && viewingOlt?.pop_name !== 'N/A'
             ? {
@@ -382,6 +426,22 @@ const Olts: React.FC = () => {
             : undefined
         }
       />
+
+      <Snackbar
+        open={Boolean(reachabilityMessage)}
+        autoHideDuration={6000}
+        onClose={() => setReachabilityMessage('')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          onClose={() => setReachabilityMessage('')}
+          severity={reachabilitySeverity}
+          variant="filled"
+          sx={{ width: '100%' }}
+        >
+          {reachabilityMessage}
+        </Alert>
+      </Snackbar>
     </Layout>
   );
 };

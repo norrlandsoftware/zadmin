@@ -30,6 +30,7 @@ interface DetailDialogProps {
   onClose: () => void;
   title: string;
   data: any;
+  actions?: React.ReactNode;
   fieldActions?: Record<string, DetailDialogFieldAction>;
   fullWidthFields?: string[];
   htmlPreviewFields?: string[];
@@ -40,6 +41,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   onClose,
   title,
   data,
+  actions,
   fieldActions,
   fullWidthFields = [],
   htmlPreviewFields = [],
@@ -468,6 +470,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
         </DialogContent>
         <Divider />
         <DialogActions sx={{ px: 3, py: 2 }}>
+          {actions}
           <Button onClick={onClose} variant="contained">
             Close
           </Button>

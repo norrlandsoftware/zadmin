@@ -27,6 +27,7 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import ClearIcon from '@mui/icons-material/Clear';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -36,6 +37,7 @@ import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
 import { onts, olts } from '../services/api.ts';
+import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
 const columns = [
   { id: 'serial_number', label: 'Serial Number' },
@@ -112,6 +114,7 @@ const columns = [
       );
     }
   },
+  { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
 ];
 
 const formatOpticalMetric = (value: any): string => {
@@ -121,6 +124,9 @@ const formatOpticalMetric = (value: any): string => {
 
   return String(value);
 };
+
+type ConfigurationFilter = 'fullyConfigured' | 'notFullyConfigured' | '';
+const FULLY_CONFIGURED_QUERY = 'admin_status:configure,operational_status:configured,notified_to_bss:true';
 
 const Onts: React.FC = () => {
   const [page, setPage] = useState(0);
@@ -132,7 +138,11 @@ const Onts: React.FC = () => {
   const [viewingOnt, setViewingOnt] = useState<any>(null);
   const [troubleshootingOnt, setTroubleshootingOnt] = useState<any>(null);
   const [searchSerial, setSearchSerial] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [searchSapId, setSearchSapId] = useState('');
+  const [debouncedSearchSerial, setDebouncedSearchSerial] = useState('');
+  const [debouncedSearchSapId, setDebouncedSearchSapId] = useState('');
+  const [moreFiltersOpen, setMoreFiltersOpen] = useState(false);
+  const [configurationFilter, setConfigurationFilter] = useState<ConfigurationFilter>('');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [confirmStartTroubleshoot, setConfirmStartTroubleshoot] = useState(false);
   const [isStartingTroubleshoot, setIsStartingTroubleshoot] = useState(false);
@@ -145,19 +155,43 @@ const Onts: React.FC = () => {
   // Debounce search input
   useEffect(() => {
     const timer = setTimeout(() => {
-      setDebouncedSearch(searchSerial);
+      setDebouncedSearchSerial(searchSerial);
+      setDebouncedSearchSapId(searchSapId);
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [searchSerial]);
+  }, [searchSerial, searchSapId]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [debouncedSearchSerial, debouncedSearchSapId, configurationFilter]);
+
+  const searchFilters = [
+    debouncedSearchSerial && `serial_number[regex]:${debouncedSearchSerial}`,
+    debouncedSearchSapId && `sap_id[regex]:${debouncedSearchSapId}`,
+  ].filter(Boolean);
+
+  const ontFilters = [
+    ...searchFilters,
+    ...(configurationFilter === 'fullyConfigured'
+      ? [FULLY_CONFIGURED_QUERY]
+      : []),
+  ];
 
   const { data, isLoading, refetch } = useQuery(
-    ['onts', page, rowsPerPage, debouncedSearch], 
-    () => onts.getAll({ 
-      page: page + 1, 
-      size: rowsPerPage,
-      ...(debouncedSearch && { q: `serial_number[regex]:${debouncedSearch}` })
-    }),
+    ['onts', page, rowsPerPage, debouncedSearchSerial, debouncedSearchSapId, configurationFilter],
+    () => {
+      const params = {
+        page: page + 1,
+        size: rowsPerPage,
+        sort: UPDATED_AT_DESC_SORT,
+        ...(ontFilters.length > 0 && { q: ontFilters }),
+      };
+
+      return configurationFilter === 'notFullyConfigured'
+        ? onts.getNotFullyConfigured(params)
+        : onts.getAll(params);
+    },
     {
       keepPreviousData: true,
     }
@@ -269,6 +303,15 @@ const Onts: React.FC = () => {
     }
   };
 
+  const handleClearFilters = () => {
+    setSearchSerial('');
+    setSearchSapId('');
+    setDebouncedSearchSerial('');
+    setDebouncedSearchSapId('');
+    setConfigurationFilter('');
+    setPage(0);
+  };
+
   if (isLoading && !data) {
     return (
       <Layout title="Optical Network Terminals">
@@ -280,13 +323,13 @@ const Onts: React.FC = () => {
   return (
     <Layout title="Optical Network Terminals">
       <Box sx={{ mb: 4 }}>
-        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <TextField
             placeholder="Search by Serial Number"
             value={searchSerial}
             onChange={(e) => setSearchSerial(e.target.value)}
             size="small"
-            sx={{ flexGrow: 1, maxWidth: 400 }}
+            sx={{ flexGrow: 1, minWidth: 240, maxWidth: 400 }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
@@ -306,7 +349,76 @@ const Onts: React.FC = () => {
               ),
             }}
           />
+          <TextField
+            placeholder="Search by SAP ID"
+            value={searchSapId}
+            onChange={(e) => setSearchSapId(e.target.value)}
+            size="small"
+            sx={{ flexGrow: 1, minWidth: 240, maxWidth: 400 }}
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+              endAdornment: searchSapId && (
+                <InputAdornment position="end">
+                  <IconButton
+                    size="small"
+                    onClick={() => setSearchSapId('')}
+                    edge="end"
+                  >
+                    <ClearIcon />
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+          <Button
+            variant={moreFiltersOpen ? 'contained' : 'outlined'}
+            color="primary"
+            startIcon={<FilterListIcon />}
+            onClick={() => setMoreFiltersOpen((prev) => !prev)}
+            sx={{ flexShrink: 0 }}
+          >
+            More Filters
+          </Button>
+          <Button
+            variant="outlined"
+            color="primary"
+            startIcon={<ClearIcon />}
+            onClick={handleClearFilters}
+            sx={{ flexShrink: 0 }}
+          >
+            Clear
+          </Button>
         </Box>
+        {moreFiltersOpen && (
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', mt: 2 }}>
+            <Button
+              variant={configurationFilter === 'fullyConfigured' ? 'contained' : 'outlined'}
+              color="primary"
+              onClick={() =>
+                setConfigurationFilter((prev) =>
+                  prev === 'fullyConfigured' ? '' : 'fullyConfigured'
+                )
+              }
+            >
+              Fully Configured
+            </Button>
+            <Button
+              variant={configurationFilter === 'notFullyConfigured' ? 'contained' : 'outlined'}
+              color="primary"
+              onClick={() =>
+                setConfigurationFilter((prev) =>
+                  prev === 'notFullyConfigured' ? '' : 'notFullyConfigured'
+                )
+              }
+            >
+              Not Fully Configured
+            </Button>
+          </Box>
+        )}
       </Box>
 
       <DataTable

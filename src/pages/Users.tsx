@@ -16,6 +16,7 @@ import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
 import { users } from '../services/api.ts';
+import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
 const availableRoles = ['admin', 'bss', 'discoverer'];
 
@@ -24,6 +25,7 @@ const columns = [
   { id: 'email', label: 'Email' },
   { id: 'role', label: 'Role', format: (value: string) => value || 'N/A' },
   { id: 'is_active', label: 'Active', format: (value: boolean) => value ? 'Yes' : 'No' },
+  { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
 ];
 
 const Users: React.FC = () => {
@@ -37,7 +39,7 @@ const Users: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const { data, isLoading, refetch } = useQuery(['users', page, rowsPerPage], () =>
-    users.getAll({ page: page + 1, size: rowsPerPage })
+    users.getAll({ page: page + 1, size: rowsPerPage, sort: UPDATED_AT_DESC_SORT })
   );
 
   const handleView = (user: any) => {

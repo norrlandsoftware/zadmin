@@ -15,11 +15,13 @@ import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
 import { apiConfigs } from '../services/api.ts';
+import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
 const columns = [
   { id: 'name', label: 'Name' },
   { id: 'component', label: 'Component', format: (value: string) => value || 'N/A' },
   { id: 'type', label: 'Type', format: (value: string) => value || 'N/A' },
+  { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
 ];
 
 const Settings: React.FC = () => {
@@ -34,7 +36,7 @@ const Settings: React.FC = () => {
   const [pageError, setPageError] = useState<string | null>(null);
 
   const { data, isLoading, refetch } = useQuery(['api-configs', page, rowsPerPage], () =>
-    apiConfigs.getAll({ page: page + 1, size: rowsPerPage })
+    apiConfigs.getAll({ page: page + 1, size: rowsPerPage, sort: UPDATED_AT_DESC_SORT })
   );
 
   const openCreateDialog = () => {
