@@ -111,6 +111,17 @@ export const olts = {
   },
 };
 
+export const oltSettings = {
+  save: async (oltId: string, data: any) => {
+    const response = await api.put(`/olt/${oltId}/settings/`, data);
+    return response.data;
+  },
+  getByOltId: async (oltId: string) => {
+    const response = await api.get(`/olt/${oltId}/settings/`);
+    return response.data;
+  },
+};
+
 // ONT API
 export const onts = {
   getAll: async (params?: any) => {
@@ -214,3 +225,28 @@ export const emailTemplates = {
     return response.data;
   },
 };
+
+const createCrudApi = (path: string) => ({
+  getAll: async (params?: any) => {
+    const response = await api.get(`${path}/`, { params });
+    return response.data;
+  },
+  getById: async (id: string) => {
+    const response = await api.get(`${path}/${id}/`);
+    return response.data;
+  },
+  create: async (data: any) => {
+    const response = await api.post(`${path}/`, data);
+    return response.data;
+  },
+  update: async (id: string, data: any) => {
+    const response = await api.put(`${path}/${id}/`, data);
+    return response.data;
+  },
+});
+
+export const oltModels = createCrudApi('/olt_model');
+export const oltLineCardModels = createCrudApi('/olt_line_card_model');
+export const oltUplinkCardModels = createCrudApi('/olt_uplink_model');
+export const switchModels = createCrudApi('/switch_model');
+export const switches = createCrudApi('/switch');

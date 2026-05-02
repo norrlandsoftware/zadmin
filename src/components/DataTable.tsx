@@ -15,6 +15,7 @@ import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import BuildIcon from '@mui/icons-material/Build';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 interface Column {
   id: string;
@@ -35,6 +36,7 @@ interface DataTableProps {
   onDelete?: (row: any) => void;
   onRowClick?: (row: any) => void;
   onTroubleshoot?: (row: any) => void;
+  onConfigure?: (row: any) => void;
 }
 
 const DataTable: React.FC<DataTableProps> = ({
@@ -50,9 +52,11 @@ const DataTable: React.FC<DataTableProps> = ({
   onDelete,
   onRowClick,
   onTroubleshoot,
+  onConfigure,
 }) => {
-  const hasActions = Boolean(onView || onEdit || onDelete || onTroubleshoot);
-  const actionsColumnWidth = hasActions ? 112 : 0;
+  const hasActions = Boolean(onView || onEdit || onDelete || onTroubleshoot || onConfigure);
+  const actionCount = [onView, onTroubleshoot, onConfigure, onEdit, onDelete].filter(Boolean).length;
+  const actionsColumnWidth = hasActions ? Math.max(112, actionCount * 32) : 0;
   const dataColumnWidth = hasActions
     ? `calc((100% - ${actionsColumnWidth}px) / ${columns.length})`
     : `${100 / columns.length}%`;
@@ -167,6 +171,18 @@ const DataTable: React.FC<DataTableProps> = ({
                           sx={{ p: 0.5 }}
                         >
                           <BuildIcon />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {onConfigure && (
+                      <Tooltip title="Configure">
+                        <IconButton
+                          size="small"
+                          onClick={() => onConfigure(row)}
+                          color="primary"
+                          sx={{ p: 0.5 }}
+                        >
+                          <SettingsIcon />
                         </IconButton>
                       </Tooltip>
                     )}

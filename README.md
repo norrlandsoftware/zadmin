@@ -50,7 +50,7 @@ Step 1 - Create the Docker
 `docker build --platform linux/amd64 -t zadmin .`
 
 Step 2 - Tag docker image (i.e. under the lboff account)
-`docker tag zadmin: lboff/zadmin:<VERSION>`
+`docker tag zadmin lboff/zadmin:<VERSION>`
 
 Step 3 - Upload the docker image (i.e. under the lboff account)
 

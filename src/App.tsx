@@ -10,12 +10,15 @@ import Login from './pages/Login.tsx';
 import Dashboard from './pages/Dashboard.tsx';
 import Pops from './pages/Pops.tsx';
 import Olts from './pages/Olts.tsx';
+import OltSettings from './pages/OltConfiguration.tsx';
 import Onts from './pages/Onts.tsx';
+import Switches from './pages/Switches.tsx';
 import Users from './pages/Users.tsx';
 import Settings from './pages/Settings.tsx';
 import EmailTemplates from './pages/EmailTemplates.tsx';
 import ResetPassword from './pages/ResetPassword.tsx';
 import About from './pages/About.tsx';
+import DeviceModels from './pages/DeviceModels.tsx';
 
 const queryClient = new QueryClient();
 
@@ -64,10 +67,26 @@ const App: React.FC = () => {
                 }
               />
               <Route
+                path="/olts/:id/settings"
+                element={
+                  <PrivateRoute>
+                    <OltSettings />
+                  </PrivateRoute>
+                }
+              />
+              <Route
                 path="/onts/*"
                 element={
                   <PrivateRoute>
                     <Onts />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/switches/*"
+                element={
+                  <PrivateRoute>
+                    <Switches />
                   </PrivateRoute>
                 }
               />
@@ -100,6 +119,14 @@ const App: React.FC = () => {
                 element={
                   <PrivateRoute>
                     <EmailTemplates />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/device-models/:modelType"
+                element={
+                  <PrivateRoute>
+                    <DeviceModels />
                   </PrivateRoute>
                 }
               />

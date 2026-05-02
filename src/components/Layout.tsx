@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AppBar,
   Box,
@@ -20,6 +20,7 @@ import DashboardIcon from '@mui/icons-material/Dashboard';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import RouterIcon from '@mui/icons-material/Router';
 import DeviceHubIcon from '@mui/icons-material/DeviceHub';
+import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import PeopleIcon from '@mui/icons-material/People';
 import SettingsIcon from '@mui/icons-material/Settings';
@@ -27,6 +28,7 @@ import EmailIcon from '@mui/icons-material/Email';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
+import DeveloperBoardIcon from '@mui/icons-material/DeveloperBoard';
 import { useAuth } from '../contexts/AuthContext.tsx';
 
 const drawerWidth = 240;
@@ -37,8 +39,11 @@ interface LayoutProps {
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, title }) => {
+  const location = useLocation();
+  const isDeviceModelsRoute = location.pathname.startsWith('/device-models');
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(true);
+  const [adminOpen, setAdminOpen] = useState(isDeviceModelsRoute);
+  const [deviceModelsOpen, setDeviceModelsOpen] = useState(isDeviceModelsRoute);
   const { logout } = useAuth();
   const navigate = useNavigate();
 
@@ -47,6 +52,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
     { text: 'POPs', icon: <LocationOnIcon />, path: '/pops' },
     { text: 'OLTs', icon: <DeviceHubIcon />, path: '/olts' },
     { text: 'ONTs', icon: <RouterIcon />, path: '/onts' },
+    { text: 'Switch', icon: <SettingsEthernetIcon />, path: '/switches' },
   ];
 
   const adminMenuItems = [
@@ -56,12 +62,23 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
     { text: 'Users', icon: <PeopleIcon />, path: '/users' },
   ];
 
+  const deviceModelMenuItems = [
+    { text: 'OLT', path: '/device-models/olt' },
+    { text: 'OLT Line Card', path: '/device-models/olt-line-card' },
+    { text: 'OLT Uplink Card', path: '/device-models/olt-uplink-card' },
+    { text: 'Switch', path: '/device-models/switch' },
+  ];
+
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
 
   const handleAdminToggle = () => {
     setAdminOpen((current) => !current);
+  };
+
+  const handleDeviceModelsToggle = () => {
+    setDeviceModelsOpen((current) => !current);
   };
 
   const drawer = (
@@ -96,7 +113,55 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
         </ListItem>
         <Collapse in={adminOpen} timeout="auto" unmountOnExit={false}>
           <List component="div" disablePadding>
-            {adminMenuItems.map((item) => (
+            <ListItem
+              button
+              sx={{ pl: 4 }}
+              onClick={() => {
+                navigate('/about');
+                setMobileOpen(false);
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 36, color: 'primary.main' }}>
+                <InfoOutlinedIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="About"
+                primaryTypographyProps={{ fontSize: '0.875rem' }}
+              />
+            </ListItem>
+            <ListItem button sx={{ pl: 4 }} onClick={handleDeviceModelsToggle}>
+              <ListItemIcon sx={{ minWidth: 36, color: 'primary.main' }}>
+                <DeveloperBoardIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="Device Models"
+                primaryTypographyProps={{ fontSize: '0.875rem' }}
+              />
+              {deviceModelsOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+            </ListItem>
+            <Collapse in={deviceModelsOpen} timeout="auto" unmountOnExit={false}>
+              <List component="div" disablePadding>
+                {deviceModelMenuItems.map((item) => (
+                  <ListItem
+                    button
+                    key={item.text}
+                    sx={{ pl: 7 }}
+                    onClick={() => {
+                      navigate(item.path);
+                      setMobileOpen(false);
+                    }}
+                  >
+                    <ListItemText
+                      primary={item.text}
+                      primaryTypographyProps={{ fontSize: '0.8125rem' }}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            </Collapse>
+            {adminMenuItems
+              .filter((item) => item.text !== 'About')
+              .map((item) => (
               <ListItem
                 button
                 key={item.text}
