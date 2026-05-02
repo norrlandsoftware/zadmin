@@ -37,6 +37,7 @@ interface DataTableProps {
   onRowClick?: (row: any) => void;
   onTroubleshoot?: (row: any) => void;
   onConfigure?: (row: any) => void;
+  isConfigureDisabled?: (row: any) => boolean;
 }
 
 const DataTable: React.FC<DataTableProps> = ({
@@ -53,6 +54,7 @@ const DataTable: React.FC<DataTableProps> = ({
   onRowClick,
   onTroubleshoot,
   onConfigure,
+  isConfigureDisabled,
 }) => {
   const hasActions = Boolean(onView || onEdit || onDelete || onTroubleshoot || onConfigure);
   const actionCount = [onView, onTroubleshoot, onConfigure, onEdit, onDelete].filter(Boolean).length;
@@ -176,14 +178,17 @@ const DataTable: React.FC<DataTableProps> = ({
                     )}
                     {onConfigure && (
                       <Tooltip title="Configure">
-                        <IconButton
-                          size="small"
-                          onClick={() => onConfigure(row)}
-                          color="primary"
-                          sx={{ p: 0.5 }}
-                        >
-                          <SettingsIcon />
-                        </IconButton>
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() => onConfigure(row)}
+                            color="primary"
+                            sx={{ p: 0.5 }}
+                            disabled={Boolean(isConfigureDisabled?.(row))}
+                          >
+                            <SettingsIcon />
+                          </IconButton>
+                        </span>
                       </Tooltip>
                     )}
                     {onEdit && (

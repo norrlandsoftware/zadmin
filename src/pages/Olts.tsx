@@ -299,6 +299,7 @@ const Olts: React.FC = () => {
         onRowsPerPageChange={setRowsPerPage}
         onRowClick={handleView}
         onConfigure={handleConfigure}
+        isConfigureDisabled={(olt: any) => !olt.model_id}
         onEdit={handleEdit}
       />
 
