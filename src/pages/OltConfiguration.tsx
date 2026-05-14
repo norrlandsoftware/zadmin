@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import MaterialSymbol from '../components/MaterialSymbol.tsx';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -18,9 +19,11 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Layout from '../components/Layout.tsx';
+import { useResultBar } from '../contexts/ResultBarContext.tsx';
 import {
+  bngModels,
+  bngs,
   oltLineCardModels,
   oltModels,
   oltSettings,
@@ -63,49 +66,244 @@ interface UplinkSlotConfig {
   oltPort: string;
 }
 
+interface BngSlotConfig {
+  slotNumber: number;
+  bngId: string;
+  isPrimary: boolean;
+  priority: string;
+}
+
 const OltSettings: React.FC = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const [ponSlots, setPonSlots] = useState<PonSlotConfig[]>([]);
   const [uplinkSlots, setUplinkSlots] = useState<UplinkSlotConfig[]>([]);
+  const [bngSlots, setBngSlots] = useState<BngSlotConfig[]>([]);
   const [applyAllPonSlots, setApplyAllPonSlots] = useState(false);
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState<string | null>(null);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [isSettingsHydrated, setIsSettingsHydrated] = useState(false);
+  const [isGeneratingConfig, setIsGeneratingConfig] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [hasSavedSettings, setHasSavedSettings] = useState(false);
+  const { pushResult } = useResultBar();
 
-  const { data: olt, isLoading } = useQuery(
-    ['olt-settings-olt', id],
-    () => olts.getById(id),
-    { enabled: Boolean(id) }
-  );
-
-  const { data: oltModel, isLoading: isModelLoading } = useQuery(
-    ['olt-settings-model', olt?.model_id],
-    () => oltModels.getById(olt.model_id),
-    { enabled: Boolean(olt?.model_id) }
-  );
-
-  const { data: existingSettings, isLoading: isExistingSettingsLoading } = useQuery(
+  const {
+    data: existingSettings,
+    isLoading: isExistingSettingsLoading,
+    isError: isExistingSettingsError,
+  } = useQuery(
     ['olt-settings-existing', id],
     () => oltSettings.getByOltId(id),
     { enabled: Boolean(id), retry: false }
   );
 
+  const isSettingsResolved =
+    Boolean(id) && (!isExistingSettingsLoading || isExistingSettingsError);
+
+  const { data: olt } = useQuery(
+    ['olt-settings-olt', id],
+    () => olts.getById(id),
+    { enabled: isSettingsResolved }
+  );
+
+  const { data: oltModel, isLoading: isOltModelLoading } = useQuery(
+    ['olt-settings-model', olt?.model_id],
+    () => oltModels.getById(olt.model_id),
+    { enabled: Boolean(olt?.model_id) }
+  );
+
+  const canLoadReferencedResources =
+    isSettingsResolved;
+
+  const settingsElements = useMemo(
+    () => (existingSettings && (existingSettings as any).elements ? (existingSettings as any).elements : null),
+    [existingSettings]
+  );
+
+  const settingsLinecards = useMemo(
+    () => ((settingsElements?.linecards as any[]) || (settingsElements?.pon as any[]) || []),
+    [settingsElements]
+  );
+
+  const settingsUplinks = useMemo(
+    () => ((settingsElements?.uplinks as any[]) || (settingsElements?.uplink as any[]) || []),
+    [settingsElements]
+  );
+
+  const referencedLineCardModelCodes = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          ((existingSettings?.elements?.linecards as any[]) || []).concat((existingSettings?.elements?.pon as any[]) || [])
+            .map((item: any) => item.olt_line_card_model_code)
+            .filter(Boolean)
+        )
+      ),
+    [existingSettings]
+  );
+
+  const referencedLegacyLineCardModelIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          ((existingSettings?.elements?.linecards as any[]) || []).concat((existingSettings?.elements?.pon as any[]) || [])
+            .map((item: any) => item.olt_line_card_model_id)
+            .filter(Boolean)
+        )
+      ),
+    [existingSettings]
+  );
+
+  const referencedUplinkCardModelCodes = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          ((existingSettings?.elements?.uplinks as any[]) || []).concat((existingSettings?.elements?.uplink as any[]) || [])
+            .map((item: any) => item.olt_uplink_card_model_code)
+            .filter(Boolean)
+        )
+      ),
+    [existingSettings]
+  );
+
+  const referencedLegacyUplinkCardModelIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          ((existingSettings?.elements?.uplinks as any[]) || []).concat((existingSettings?.elements?.uplink as any[]) || [])
+            .map((item: any) => item.olt_uplink_card_model_id)
+            .filter(Boolean)
+        )
+      ),
+    [existingSettings]
+  );
+
+  const referencedSwitchIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          ((existingSettings?.elements?.uplinks as any[]) || []).concat((existingSettings?.elements?.uplink as any[]) || [])
+            .map((item: any) => item?.configuration?.uplink_device_id)
+            .filter(Boolean)
+        )
+      ),
+    [existingSettings]
+  );
+
+  const referencedBngIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          ((existingSettings?.elements?.bng as any[]) || [])
+            .map((item: any) => item.bng_id)
+            .filter(Boolean)
+        )
+      ),
+    [existingSettings]
+  );
+
+  const settingsBngIds = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (((settingsElements?.bng as any[]) || [])
+            .map((item: any) => item?.bng_id)
+            .filter(Boolean))
+        )
+      ),
+    [settingsElements]
+  );
+
   const { data: lineCardModelsData, isLoading: isLineCardModelsLoading } = useQuery(
-    ['olt-line-card-models-settings'],
-    () => oltLineCardModels.getAll({ size: 1000, sort: 'name' })
+    [
+      'olt-line-card-models-settings',
+      referencedLineCardModelCodes.join(','),
+      referencedLegacyLineCardModelIds.join(','),
+    ],
+    async () => {
+      if (referencedLineCardModelCodes.length === 0 && referencedLegacyLineCardModelIds.length === 0) {
+        return oltLineCardModels.getAll({ size: 1000, sort: 'name' });
+      }
+
+      const byCodeResults = await Promise.all(
+        referencedLineCardModelCodes.map((code) =>
+          oltLineCardModels.getAll({ q: `code:${code}`, size: 1 })
+        )
+      );
+      const byIdResults = await Promise.all(
+        referencedLegacyLineCardModelIds.map((modelId) => oltLineCardModels.getById(modelId))
+      );
+
+      const merged = [
+        ...byCodeResults.flatMap((result: any) => result?.data || []),
+        ...byIdResults.filter(Boolean),
+      ];
+      const unique = Array.from(new Map(merged.map((item: any) => [item.id, item])).values());
+
+      return { data: unique };
+    },
+    { enabled: canLoadReferencedResources }
   );
 
   const { data: uplinkCardModelsData, isLoading: isUplinkCardModelsLoading } = useQuery(
-    ['olt-uplink-card-models-settings'],
-    () => oltUplinkCardModels.getAll({ size: 1000, sort: 'name' })
+    [
+      'olt-uplink-card-models-settings',
+      referencedUplinkCardModelCodes.join(','),
+      referencedLegacyUplinkCardModelIds.join(','),
+    ],
+    async () => {
+      if (referencedUplinkCardModelCodes.length === 0 && referencedLegacyUplinkCardModelIds.length === 0) {
+        return oltUplinkCardModels.getAll({ size: 1000, sort: 'name' });
+      }
+
+      const byCodeResults = await Promise.all(
+        referencedUplinkCardModelCodes.map((code) =>
+          oltUplinkCardModels.getAll({ q: `code:${code}`, size: 1 })
+        )
+      );
+      const byIdResults = await Promise.all(
+        referencedLegacyUplinkCardModelIds.map((modelId) => oltUplinkCardModels.getById(modelId))
+      );
+
+      const merged = [
+        ...byCodeResults.flatMap((result: any) => result?.data || []),
+        ...byIdResults.filter(Boolean),
+      ];
+      const unique = Array.from(new Map(merged.map((item: any) => [item.id, item])).values());
+
+      return { data: unique };
+    },
+    { enabled: canLoadReferencedResources }
   );
 
   const { data: switchesData, isLoading: isSwitchesLoading } = useQuery(
-    ['switches-settings'],
-    () => switches.getAll({ size: 1000, sort: 'name' })
+    ['switches-settings', referencedSwitchIds.join(',')],
+    async () => {
+      if (referencedSwitchIds.length === 0) {
+        return switches.getAll({ size: 1000, sort: 'name' });
+      }
+
+      const items = await Promise.all(referencedSwitchIds.map((switchId) => switches.getById(switchId)));
+      return { data: items.filter(Boolean) };
+    },
+    { enabled: canLoadReferencedResources }
+  );
+  const { data: bngsData, isLoading: isBngsLoading } = useQuery(
+    ['bngs-settings', referencedBngIds.join(',')],
+    async () => {
+      if (referencedBngIds.length === 0) {
+        return bngs.getAll({ size: 1000, sort: 'name' });
+      }
+
+      const items = await Promise.all(referencedBngIds.map((bngId) => bngs.getById(bngId)));
+      return { data: items.filter(Boolean) };
+    },
+    { enabled: canLoadReferencedResources }
+  );
+  const { data: bngModelsData, isLoading: isBngModelsLoading } = useQuery(
+    ['bng-models-settings'],
+    () => bngModels.getAll({ size: 1000, sort: 'name' }),
+    { enabled: canLoadReferencedResources }
   );
 
   const lineCardModelById = useMemo(
@@ -114,6 +312,25 @@ const OltSettings: React.FC = () => {
         (lineCardModelsData?.data || []).map((model: any) => [model.id, model])
       ),
     [lineCardModelsData]
+  );
+  const lineCardModelByCode = useMemo(
+    () =>
+      new Map(
+        (lineCardModelsData?.data || [])
+          .filter((model: any) => model.code)
+          .map((model: any) => [model.code, model])
+      ),
+    [lineCardModelsData]
+  );
+
+  const uplinkCardModelByCode = useMemo(
+    () =>
+      new Map(
+        (uplinkCardModelsData?.data || [])
+          .filter((model: any) => model.code)
+          .map((model: any) => [model.code, model])
+      ),
+    [uplinkCardModelsData]
   );
 
   const switchById = useMemo(
@@ -125,75 +342,199 @@ const OltSettings: React.FC = () => {
     () => new Map((switchesData?.data || []).map((item: any) => [item.name, item])),
     [switchesData]
   );
-
-  const isCompatibleWithCurrentOltModel = useCallback((cardModel: any) => {
-    if (!olt?.model_id) {
-      return true;
-    }
-
-    const compatibleOltModelIds = cardModel?.olt_model_ids;
-    return (
-      !Array.isArray(compatibleOltModelIds) ||
-      compatibleOltModelIds.length === 0 ||
-      compatibleOltModelIds.includes(olt.model_id)
-    );
-  }, [olt?.model_id]);
-
-  const compatibleLineCardModels = useMemo(
-    () => (lineCardModelsData?.data || []).filter(isCompatibleWithCurrentOltModel),
-    [lineCardModelsData, isCompatibleWithCurrentOltModel]
+  const bngModelById = useMemo(
+    () => new Map((bngModelsData?.data || []).map((model: any) => [String(model.id), model])),
+    [bngModelsData]
   );
 
-  const compatibleUplinkCardModels = useMemo(
-    () => (uplinkCardModelsData?.data || []).filter(isCompatibleWithCurrentOltModel),
-    [uplinkCardModelsData, isCompatibleWithCurrentOltModel]
+  const availableBngOptions = useMemo(() => {
+    const base = (bngsData?.data || []).map((item: any) => ({
+      id: String(item.id),
+      name: item.name || String(item.id),
+    }));
+    const knownIds = new Set(base.map((item: any) => item.id));
+    const fallback = settingsBngIds
+      .map((idValue) => String(idValue))
+      .filter((idValue) => !knownIds.has(idValue))
+      .map((idValue) => ({ id: idValue, name: idValue }));
+    return [...base, ...fallback];
+  }, [bngsData, settingsBngIds]);
+
+  const settingsPonBySlot = useMemo(
+    () =>
+      new Map(
+        (settingsLinecards.map((item: any) => [Number(item.slot), item]))
+      ),
+    [settingsLinecards]
+  );
+
+  const settingsUplinkBySlot = useMemo(
+    () =>
+      new Map(
+        (settingsUplinks
+          .map((item: any) => {
+            const match = String(item?.name || '').match(/^uplink(\d+)$/);
+            return [match ? Number(match[1]) : null, item] as const;
+          })
+          .filter(([slotNumber]) => Number.isFinite(slotNumber) && (slotNumber as number) > 0))
+      ),
+    [settingsUplinks]
   );
 
   useEffect(() => {
-    const slotCount = Number(oltModel?.number_of_pon_slots || 0);
+    const ponSlotCount = Number(oltModel?.number_of_pon_slots || 0);
+    const ponSlotNumbers = Array.from({ length: ponSlotCount }, (_, index) => index + 1);
 
     setPonSlots((current) =>
-      Array.from({ length: slotCount }, (_, index) => {
-        const slotNumber = index + 1;
-        return (
-          current.find((slot) => slot.slotNumber === slotNumber) || {
-            slotNumber,
-            lineCardModelId: '',
-            splitRatio: 1,
-          }
-        );
+      ponSlotNumbers.map((slotNumber) => {
+        const currentSlot = current.find((slot) => slot.slotNumber === slotNumber);
+        if (currentSlot) {
+          return currentSlot;
+        }
+        const item = settingsPonBySlot.get(slotNumber);
+        const splitRatioValue = String(item?.configuration?.split_ratio || '');
+        const splitRatioNumber = Number(splitRatioValue.split(':')[1]);
+        const splitRatio = splitRatioValues.includes(splitRatioNumber) ? splitRatioNumber : 1;
+        return {
+          slotNumber,
+          lineCardModelId: '',
+          splitRatio,
+        };
       })
     );
 
-    if (slotCount <= 1) {
+    if (ponSlotNumbers.length <= 1) {
       setApplyAllPonSlots(false);
     }
-  }, [oltModel?.number_of_pon_slots]);
+  }, [oltModel?.number_of_pon_slots, settingsElements, settingsPonBySlot]);
 
   useEffect(() => {
-    const slotCount = Number(oltModel?.number_of_uplink_slots || 0);
+    const uplinkSlotCount = Number(oltModel?.number_of_uplink_slots || 0);
+    const uplinkSlotNumbers = Array.from({ length: uplinkSlotCount }, (_, index) => index + 1);
 
     setUplinkSlots((current) =>
-      Array.from({ length: slotCount }, (_, index) => {
-        const slotNumber = index + 1;
-        return (
-          current.find((slot) => slot.slotNumber === slotNumber) || {
-            slotNumber,
-            uplinkCardModelId: '',
-            switchId: '',
-            switchPort: '',
-            switchIpAddress: '',
-            oltPort: '',
-          }
-        );
+      uplinkSlotNumbers.map((slotNumber) => {
+        const currentSlot = current.find((slot) => slot.slotNumber === slotNumber);
+        if (currentSlot) {
+          return currentSlot;
+        }
+        const item = settingsUplinkBySlot.get(slotNumber);
+        return {
+          slotNumber,
+          uplinkCardModelId: '',
+          switchId: item?.configuration?.uplink_device_id || '',
+          switchPort: item?.configuration?.switch_port || '',
+          switchIpAddress: item?.configuration?.ip_address || '',
+          oltPort: item?.configuration?.olt_port || '',
+        };
       })
     );
-  }, [oltModel?.number_of_uplink_slots]);
+  }, [oltModel?.number_of_uplink_slots, settingsElements, settingsUplinkBySlot]);
+
+  // Reconcile slot selections when referenced resources arrive after initial settings hydration.
+  useEffect(() => {
+    if (!settingsElements) {
+      return;
+    }
+
+    setPonSlots((current) =>
+      current.map((slot) => {
+        if (slot.lineCardModelId) {
+          return slot;
+        }
+        const source = settingsPonBySlot.get(slot.slotNumber);
+        if (!source) {
+          return slot;
+        }
+        const resolvedModelId =
+          lineCardModelByCode.get(source.olt_line_card_model_code || '')?.id ||
+          source.olt_line_card_model_id ||
+          '';
+        return resolvedModelId ? { ...slot, lineCardModelId: resolvedModelId } : slot;
+      })
+    );
+
+    setUplinkSlots((current) =>
+      current.map((slot) => {
+        const source = settingsUplinkBySlot.get(slot.slotNumber);
+        if (!source) {
+          return slot;
+        }
+
+        const resolvedModelId =
+          uplinkCardModelByCode.get(source.olt_uplink_card_model_code || '')?.id ||
+          source.olt_uplink_card_model_id ||
+          '';
+        const configuredSwitchId = source.configuration?.uplink_device_id || '';
+        const configuredSwitch =
+          switchById.get(configuredSwitchId) ||
+          switchByName.get(source.configuration?.uplink_device_name || '');
+
+        return {
+          ...slot,
+          uplinkCardModelId: slot.uplinkCardModelId || resolvedModelId || '',
+          switchId: slot.switchId || configuredSwitchId || configuredSwitch?.id || '',
+          switchPort: slot.switchPort || source.configuration?.switch_port || '',
+          switchIpAddress: slot.switchIpAddress || source.configuration?.ip_address || '',
+          oltPort: slot.oltPort || source.configuration?.olt_port || '',
+        };
+      })
+    );
+  }, [
+    lineCardModelByCode,
+    settingsElements,
+    settingsPonBySlot,
+    settingsUplinkBySlot,
+    switchById,
+    switchByName,
+    uplinkCardModelByCode,
+  ]);
+
+  useEffect(() => {
+    setBngSlots((current) =>
+      Array.from({ length: 2 }, (_, index) => {
+        const slotNumber = index + 1;
+        const source = ((settingsElements?.bng as any[]) || [])[index];
+        const existing = current.find((slot) => slot.slotNumber === slotNumber);
+        if (!existing) {
+          return {
+            slotNumber,
+            bngId: source?.bng_id || '',
+            isPrimary:
+              source?.configuration?.primary != null
+                ? Boolean(source.configuration.primary)
+                : slotNumber === 1,
+            priority:
+              source?.configuration?.priority != null
+                ? String(source.configuration.priority)
+                : slotNumber === 1
+                  ? '75'
+                  : '125',
+          };
+        }
+
+        // If slot exists but is still empty, backfill from settings when they arrive.
+        return {
+          ...existing,
+          bngId: existing.bngId || (source?.bng_id != null ? String(source.bng_id) : ''),
+          isPrimary:
+            source?.configuration?.primary != null
+              ? Boolean(source.configuration.primary)
+              : existing.isPrimary,
+          priority:
+            source?.configuration?.priority != null
+              ? String(source.configuration.priority)
+              : existing.priority,
+        };
+      })
+    );
+  }, [settingsElements]);
 
   const updatePonSlot = (
     slotNumber: number,
     changes: Partial<Omit<PonSlotConfig, 'slotNumber'>>
   ) => {
+    setHasUnsavedChanges(true);
     setPonSlots((current) =>
       current.map((slot) => {
         if (applyAllPonSlots && slotNumber === 1) {
@@ -206,6 +547,7 @@ const OltSettings: React.FC = () => {
   };
 
   const handleApplyAllPonSlotsChange = (checked: boolean) => {
+    setHasUnsavedChanges(true);
     setApplyAllPonSlots(checked);
 
     if (!checked) {
@@ -230,6 +572,7 @@ const OltSettings: React.FC = () => {
     slotNumber: number,
     changes: Partial<Omit<UplinkSlotConfig, 'slotNumber'>>
   ) => {
+    setHasUnsavedChanges(true);
     setUplinkSlots((current) =>
       current.map((slot) =>
         slot.slotNumber === slotNumber ? { ...slot, ...changes } : slot
@@ -237,63 +580,197 @@ const OltSettings: React.FC = () => {
     );
   };
 
-  const buildSettingsPayload = () => ({
-    elements: {
-      pon: ponSlots
+  const updateBngSlot = (
+    slotNumber: number,
+    changes: Partial<Omit<BngSlotConfig, 'slotNumber'>>
+  ) => {
+    setHasUnsavedChanges(true);
+    setBngSlots((current) =>
+      current.map((slot) => {
+        if (slot.slotNumber !== slotNumber) {
+          return slot;
+        }
+        return { ...slot, ...changes };
+      })
+    );
+  };
+
+  const handlePrimaryBngChange = (slotNumber: number) => {
+    setHasUnsavedChanges(true);
+    setBngSlots((current) =>
+      current.map((slot) => ({
+        ...slot,
+        isPrimary: slot.slotNumber === slotNumber,
+      }))
+    );
+  };
+
+  const currentSettingsElements = useMemo(
+    () => ({
+      linecards: ponSlots
         .filter((slot) => slot.lineCardModelId)
-        .map((slot) => ({
-          slot: String(slot.slotNumber),
-          olt_line_card_model_id: slot.lineCardModelId,
-          configuration: {
-            split_ratio: `1:${slot.splitRatio}`,
-          },
-        })),
-      uplink: uplinkSlots
+        .map((slot) => {
+          const selectedLineCardModel = lineCardModelById.get(slot.lineCardModelId);
+          return {
+            slot: String(slot.slotNumber),
+            olt_line_card_model_code: selectedLineCardModel?.code || '',
+            pon_ports: selectedLineCardModel?.number_of_pon_ports ?? null,
+            configuration: {
+              split_ratio: `1:${slot.splitRatio}`,
+            },
+          };
+        }),
+      uplinks: uplinkSlots
         .filter((slot) => slot.uplinkCardModelId)
         .map((slot) => {
+          const selectedSwitch = switchById.get(slot.switchId);
           return {
             name: `uplink${slot.slotNumber}`,
-            olt_uplink_card_model_id: slot.uplinkCardModelId,
+            olt_uplink_card_model_code:
+              (uplinkCardModelsData?.data || []).find(
+                (model: any) => model.id === slot.uplinkCardModelId
+              )?.code || '',
             configuration: {
               uplink_device_type: 'switch',
               uplink_device_id: slot.switchId || '',
+              uplink_interface_name: selectedSwitch?.name || '',
               ip_address: slot.switchIpAddress,
               olt_port: slot.oltPort,
               switch_port: slot.switchPort,
             },
           };
         }),
-    },
+      bng: bngSlots
+        .filter((slot) => slot.bngId)
+        .map((slot) => {
+          const selectedBng = (bngsData?.data || []).find(
+            (item: any) => String(item.id) === String(slot.bngId)
+          );
+
+          return {
+            bng_id: slot.bngId,
+            ip_address: selectedBng?.ip_address_v4 || selectedBng?.ip_address || '',
+            model_code:
+              bngModelById.get(String(selectedBng?.model_id || ''))?.code ||
+              selectedBng?.model_code ||
+              '',
+            configuration: {
+              primary: slot.isPrimary,
+              priority: slot.priority ? Number(slot.priority) : null,
+            },
+          };
+        }),
+    }),
+    [
+      bngModelById,
+      bngSlots,
+      bngsData,
+      lineCardModelById,
+      ponSlots,
+      switchById,
+      uplinkCardModelsData,
+      uplinkSlots,
+    ]
+  );
+
+  const buildSettingsPayload = () => ({
+    elements: currentSettingsElements,
   });
 
+  useEffect(() => {
+    if (!settingsElements || !oltModel) {
+      return;
+    }
+
+    const expectedPonSlots = Number(oltModel.number_of_pon_slots || 0);
+    const expectedUplinkSlots = Number(oltModel.number_of_uplink_slots || 0);
+    if (
+      ponSlots.length !== expectedPonSlots ||
+      uplinkSlots.length !== expectedUplinkSlots ||
+      bngSlots.length !== 2
+    ) {
+      return;
+    }
+
+    const hasAnyExisting =
+      settingsLinecards.length > 0 ||
+      settingsUplinks.length > 0 ||
+      (((settingsElements.bng as any[]) || []).length > 0);
+
+    setHasSavedSettings(hasAnyExisting);
+    setHasUnsavedChanges(false);
+  }, [
+    bngSlots.length,
+    oltModel,
+    ponSlots.length,
+    settingsElements,
+    settingsLinecards.length,
+    settingsUplinks.length,
+    uplinkSlots.length,
+  ]);
+
   const handleOpenSaveConfirm = () => {
-    setSaveError(null);
-    setSaveMessage(null);
     setConfirmSaveOpen(true);
   };
 
+  const handleGenerateConfiguration = async () => {
+    if (!id) {
+      return;
+    }
+
+    setIsGeneratingConfig(true);
+
+    try {
+      await olts.renderConfig(id);
+      pushResult('success', 'Configuration generated.');
+    } catch (error: any) {
+      const responseData = error?.response?.data;
+      const contextMessage =
+        responseData?.context?.message ||
+        responseData?.detail?.context?.message ||
+        null;
+      pushResult(
+        'error',
+        contextMessage ||
+          error?.response?.data?.detail?.[0]?.msg ||
+          error?.response?.data?.message ||
+          'Unable to generate configuration.'
+      );
+    } finally {
+      setIsGeneratingConfig(false);
+    }
+  };
+
   useEffect(() => {
-    if (isSettingsHydrated) {
+    if (!oltModel) {
       return;
     }
 
-    if (ponSlots.length === 0 && uplinkSlots.length === 0) {
+    const expectedPonSlots = Number(oltModel?.number_of_pon_slots || 0);
+    const expectedUplinkSlots = Number(oltModel?.number_of_uplink_slots || 0);
+    const isPonReady = ponSlots.length === expectedPonSlots;
+    const isUplinkReady = uplinkSlots.length === expectedUplinkSlots;
+    const isBngReady = bngSlots.length === 2;
+
+    if (!isPonReady || !isUplinkReady || !isBngReady) {
       return;
     }
 
-    if (!existingSettings?.elements) {
-      setIsSettingsHydrated(true);
+    if (!settingsElements) {
       return;
     }
 
     const existingPonBySlot = new Map(
-      ((existingSettings.elements.pon as any[]) || []).map((item: any) => [
+      (settingsLinecards || []).map((item: any) => [
         Number(item.slot),
         item,
       ])
     );
     const existingUplinkByName = new Map(
-      ((existingSettings.elements.uplink as any[]) || []).map((item: any) => [item.name, item])
+      (settingsUplinks || []).map((item: any) => [item.name, item])
+    );
+    const existingBngByName = new Map(
+      ((settingsElements.bng as any[]) || []).map((item: any) => [item.name, item])
     );
 
     setPonSlots((current) =>
@@ -311,7 +788,10 @@ const OltSettings: React.FC = () => {
 
         return {
           ...slot,
-          lineCardModelId: existingSlot.olt_line_card_model_id || '',
+          lineCardModelId:
+            lineCardModelByCode.get(existingSlot.olt_line_card_model_code || '')?.id ||
+            existingSlot.olt_line_card_model_id ||
+            '',
           splitRatio: normalizedSplitRatio,
         };
       })
@@ -331,7 +811,10 @@ const OltSettings: React.FC = () => {
 
         return {
           ...slot,
-          uplinkCardModelId: existingSlot.olt_uplink_card_model_id || '',
+          uplinkCardModelId:
+            uplinkCardModelByCode.get(existingSlot.olt_uplink_card_model_code || '')?.id ||
+            existingSlot.olt_uplink_card_model_id ||
+            '',
           switchId: configuredSwitchId || configuredSwitch?.id || '',
           switchPort: existingSlot.configuration?.switch_port || '',
           switchIpAddress: existingSlot.configuration?.ip_address || '',
@@ -340,27 +823,67 @@ const OltSettings: React.FC = () => {
       })
     );
 
-    setIsSettingsHydrated(true);
+    setBngSlots((current) =>
+      current.map((slot, index) => {
+        const existingSlot =
+          ((settingsElements.bng as any[]) || [])[index] ||
+          existingBngByName.get(`bng${slot.slotNumber}`);
+        if (!existingSlot) {
+          return slot;
+        }
+
+        return {
+          ...slot,
+          bngId: existingSlot.bng_id || '',
+          isPrimary: Boolean(existingSlot.configuration?.primary),
+          priority: existingSlot.configuration?.priority != null
+            ? String(existingSlot.configuration.priority)
+            : slot.priority,
+        };
+      })
+    );
+
   }, [
-    existingSettings,
-    isSettingsHydrated,
+    bngSlots.length,
+    bngsData,
+    lineCardModelByCode,
+    lineCardModelsData,
+    oltModel?.number_of_pon_slots,
+    oltModel?.number_of_uplink_slots,
+    settingsElements,
+    settingsLinecards,
+    settingsUplinks,
     ponSlots.length,
+    referencedBngIds.length,
+    referencedLineCardModelCodes.length,
+    referencedSwitchIds.length,
+    referencedUplinkCardModelCodes.length,
     switchById,
     switchByName,
+    switchesData,
+    uplinkCardModelByCode,
+    uplinkCardModelsData,
     uplinkSlots.length,
+    oltModel,
   ]);
 
   const handleConfirmSave = async () => {
     setIsSaving(true);
-    setSaveError(null);
-    setSaveMessage(null);
 
     try {
-      await oltSettings.save(id, buildSettingsPayload());
+      const payload = buildSettingsPayload();
+      await oltSettings.save(id, payload);
       setConfirmSaveOpen(false);
-      setSaveMessage('OLT settings saved.');
+      pushResult('success', 'OLT settings saved.');
+      setHasSavedSettings(
+        payload.elements.linecards.length > 0 ||
+          payload.elements.uplinks.length > 0 ||
+          payload.elements.bng.length > 0
+      );
+      setHasUnsavedChanges(false);
     } catch (error: any) {
-      setSaveError(
+      pushResult(
+        'error',
         error?.response?.data?.detail?.[0]?.msg ||
           error?.response?.data?.message ||
           'Unable to save OLT settings.'
@@ -371,12 +894,14 @@ const OltSettings: React.FC = () => {
   };
 
   if (
-    isLoading ||
-    isModelLoading ||
     isExistingSettingsLoading ||
+    !olt ||
+    isOltModelLoading ||
     isLineCardModelsLoading ||
     isUplinkCardModelsLoading ||
-    isSwitchesLoading
+    isSwitchesLoading ||
+    isBngsLoading ||
+    isBngModelsLoading
   ) {
     return (
       <Layout title="OLT Settings">
@@ -390,14 +915,14 @@ const OltSettings: React.FC = () => {
       <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', gap: 2 }}>
         <Button
           variant="outlined"
-          startIcon={<ArrowBackIcon />}
+          startIcon={<MaterialSymbol name="arrow_back" />}
           onClick={() => navigate('/olts')}
         >
           Back
         </Button>
         <Box sx={{ minWidth: 0, flex: 1 }}>
           <Typography variant="h6" sx={{ lineHeight: 1.2 }}>
-            {olt?.name || 'OLT Settings'}
+            {olt?.name || `OLT Settings #${id}`}
           </Typography>
           {olt?.ip_address_v4 && (
             <Typography variant="body2" color="text.secondary">
@@ -412,18 +937,14 @@ const OltSettings: React.FC = () => {
         >
           Save
         </Button>
+        <Button
+          variant="outlined"
+          onClick={handleGenerateConfiguration}
+          disabled={!hasSavedSettings || hasUnsavedChanges || isSaving || isGeneratingConfig || !id}
+        >
+          {isGeneratingConfig ? 'Generating...' : 'Generate Configuration'}
+        </Button>
       </Box>
-
-      {saveMessage && (
-        <Alert severity="success" sx={{ mb: 2 }}>
-          {saveMessage}
-        </Alert>
-      )}
-      {saveError && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {saveError}
-        </Alert>
-      )}
 
       <Box sx={{ display: 'grid', gap: 3 }}>
         <Paper sx={{ p: 2 }}>
@@ -450,14 +971,9 @@ const OltSettings: React.FC = () => {
               />
             )}
           </Box>
-          {!olt?.model_id && (
+          {ponSlots.length === 0 && (
             <Alert severity="info">
-              This OLT does not have a model assigned.
-            </Alert>
-          )}
-          {olt?.model_id && ponSlots.length === 0 && (
-            <Alert severity="info">
-              The selected OLT model has no PON slots.
+              No PON slots found in current OLT settings.
             </Alert>
           )}
           {ponSlots.length > 0 && (
@@ -466,12 +982,12 @@ const OltSettings: React.FC = () => {
                 px: 1.25,
                 mb: 0.5,
                 display: { xs: 'none', md: 'grid' },
-                gridTemplateColumns: '64px minmax(200px, 1.1fr) 72px 92px minmax(220px, 1.4fr) 56px',
+                gridTemplateColumns: '64px minmax(200px, 1.1fr) 72px minmax(220px, 1.4fr) 56px',
                 gap: 1.25,
                 alignItems: 'center',
               }}
             >
-              {['Slot', 'Line Card', 'PON', 'XGSPON', 'Split Ratio', ''].map((label, index) => (
+              {['Slot', 'Line Card', 'PON', 'Split Ratio', ''].map((label, index) => (
                 <Typography
                   key={`${label}-${index}`}
                   variant="caption"
@@ -487,7 +1003,6 @@ const OltSettings: React.FC = () => {
             const isDisabledByApplyAll = applyAllPonSlots && slot.slotNumber !== 1;
             const lineCardModel = lineCardModelById.get(slot.lineCardModelId);
             const ponPorts = lineCardModel?.number_of_pon_ports ?? 0;
-            const xgsponPorts = lineCardModel?.number_of_xgspon_ports ?? 0;
             const sliderValue = Math.max(0, splitRatioValues.indexOf(slot.splitRatio));
 
             return (
@@ -496,6 +1011,7 @@ const OltSettings: React.FC = () => {
                 sx={{
                   border: 1,
                   borderColor: 'divider',
+                  bgcolor: 'grey.100',
                   borderRadius: 1,
                   px: 1.25,
                   py: 0.5,
@@ -503,7 +1019,7 @@ const OltSettings: React.FC = () => {
                   display: 'grid',
                   gridTemplateColumns: {
                     xs: '1fr',
-                    md: '64px minmax(200px, 1.1fr) 72px 92px minmax(220px, 1.4fr) 56px',
+                    md: '64px minmax(200px, 1.1fr) 72px minmax(220px, 1.4fr) 56px',
                   },
                   gap: 1.25,
                   alignItems: 'center',
@@ -527,7 +1043,7 @@ const OltSettings: React.FC = () => {
                   }
                 >
                   <MenuItem value="">N/A</MenuItem>
-                  {compatibleLineCardModels.map((model: any) => (
+                  {(lineCardModelsData?.data || []).map((model: any) => (
                     <MenuItem key={model.id} value={model.id}>
                       {model.name}
                     </MenuItem>
@@ -535,9 +1051,6 @@ const OltSettings: React.FC = () => {
                 </TextField>
                 <Typography variant="body2" color="text.secondary">
                   {slot.lineCardModelId ? ponPorts : 'N/A'}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {slot.lineCardModelId ? xgsponPorts : 'N/A'}
                 </Typography>
                 <Box sx={{ px: 1, minWidth: 0 }}>
                   <Slider
@@ -569,14 +1082,9 @@ const OltSettings: React.FC = () => {
           <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 700 }}>
             Uplink
           </Typography>
-          {!olt?.model_id && (
+          {uplinkSlots.length === 0 && (
             <Alert severity="info">
-              This OLT does not have a model assigned.
-            </Alert>
-          )}
-          {olt?.model_id && uplinkSlots.length === 0 && (
-            <Alert severity="info">
-              The selected OLT model has no uplink slots.
+              No uplink slots found in current OLT settings.
             </Alert>
           )}
           {uplinkSlots.length > 0 && (
@@ -611,6 +1119,7 @@ const OltSettings: React.FC = () => {
               sx={{
                 border: 1,
                 borderColor: 'divider',
+                bgcolor: 'grey.100',
                 borderRadius: 1,
                 px: 1.25,
                 py: 0.5,
@@ -640,7 +1149,7 @@ const OltSettings: React.FC = () => {
                 }
               >
                 <MenuItem value="">N/A</MenuItem>
-                {compatibleUplinkCardModels.map((model: any) => (
+                {(uplinkCardModelsData?.data || []).map((model: any) => (
                   <MenuItem key={model.id} value={model.id}>
                     {model.name}
                   </MenuItem>
@@ -695,6 +1204,97 @@ const OltSettings: React.FC = () => {
             </Box>
           ))}
         </Paper>
+
+        <Paper sx={{ p: 2 }}>
+          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 700 }}>
+            BNG
+          </Typography>
+          <Box
+            sx={{
+              px: 1.25,
+              mb: 0.5,
+              display: { xs: 'none', md: 'grid' },
+              gridTemplateColumns: '64px minmax(220px, 1fr) 110px 120px',
+              gap: 1.25,
+              alignItems: 'center',
+            }}
+          >
+            {['Slot', 'BNG', 'Primary', 'Priority'].map((label) => (
+              <Typography
+                key={label}
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontWeight: 700 }}
+              >
+                {label}
+              </Typography>
+            ))}
+          </Box>
+          {bngSlots.map((slot) => (
+            <Box
+              key={slot.slotNumber}
+              sx={{
+                border: 1,
+                borderColor: 'divider',
+                bgcolor: 'grey.100',
+                borderRadius: 1,
+                px: 1.25,
+                py: 0.5,
+                mb: 0.75,
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: '1fr',
+                  md: '64px minmax(220px, 1fr) 110px 120px',
+                },
+                gap: 1.25,
+                alignItems: 'center',
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {slot.slotNumber}
+              </Typography>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                sx={compactFieldSx}
+                value={slot.bngId}
+                onChange={(event) =>
+                  updateBngSlot(slot.slotNumber, { bngId: event.target.value })
+                }
+              >
+                <MenuItem value="">N/A</MenuItem>
+                {availableBngOptions.map((item: any) => (
+                  <MenuItem key={item.id} value={item.id}>
+                    {item.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={slot.isPrimary}
+                    onChange={() => handlePrimaryBngChange(slot.slotNumber)}
+                  />
+                }
+                label=""
+                sx={{ m: 0, justifyContent: 'center' }}
+              />
+              <TextField
+                fullWidth
+                size="small"
+                sx={compactFieldSx}
+                type="number"
+                value={slot.priority}
+                inputProps={{ min: 1, step: 1 }}
+                onChange={(event) =>
+                  updateBngSlot(slot.slotNumber, { priority: event.target.value })
+                }
+              />
+            </Box>
+          ))}
+        </Paper>
       </Box>
 
       <Dialog
@@ -705,13 +1305,8 @@ const OltSettings: React.FC = () => {
       >
         <DialogTitle>Save OLT Settings</DialogTitle>
         <DialogContent>
-          {saveError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {saveError}
-            </Alert>
-          )}
           <Typography variant="body2" color="text.secondary">
-            Confirm saving the current PON and uplink settings for this OLT.
+            Confirm saving the current PON, uplink, and BNG settings for this OLT.
           </Typography>
         </DialogContent>
         <DialogActions>

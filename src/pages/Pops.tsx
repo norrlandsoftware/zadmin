@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import MaterialSymbol from '../components/MaterialSymbol.tsx';
 import { useQuery } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -15,8 +16,6 @@ import {
   InputAdornment,
   IconButton,
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import ClearIcon from '@mui/icons-material/Clear';
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
@@ -42,6 +41,9 @@ const Pops: React.FC = () => {
   const [tabValue, setTabValue] = useState(0);
   const [searchName, setSearchName] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [popForm, setPopForm] = useState<Record<string, string>>({});
+  const [geocodeLoading, setGeocodeLoading] = useState(false);
+  const [geocodeError, setGeocodeError] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -101,18 +103,94 @@ const Pops: React.FC = () => {
 
   const handleEdit = (pop: any) => {
     setEditingPop(pop);
+    setPopForm({
+      name: pop?.name || '',
+      address: pop?.address || '',
+      postal_code: pop?.postal_code || '',
+      city: pop?.city || '',
+      province: pop?.province || '',
+      country: pop?.country || '',
+      latitude: pop?.latitude || '',
+      longitude: pop?.longitude || '',
+    });
+    setDialogOpen(true);
+  };
+
+  const handleCreate = () => {
+    setEditingPop(null);
+    setPopForm({
+      name: '',
+      address: '',
+      postal_code: '',
+      city: '',
+      province: '',
+      country: '',
+      latitude: '',
+      longitude: '',
+    });
     setDialogOpen(true);
   };
 
   const handleClose = () => {
     setDialogOpen(false);
     setEditingPop(null);
+    setPopForm({});
+    setGeocodeError(null);
+    setGeocodeLoading(false);
   };
+
+  useEffect(() => {
+    if (!dialogOpen || Boolean(editingPop)) return;
+
+    const address = popForm.address?.trim();
+    const city = popForm.city?.trim();
+    const country = popForm.country?.trim();
+    const latitude = popForm.latitude?.trim();
+    const longitude = popForm.longitude?.trim();
+
+    if (!address || !city || !country) {
+      setGeocodeError(null);
+      return;
+    }
+
+    if (latitude && longitude) {
+      setGeocodeError(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setGeocodeLoading(true);
+      setGeocodeError(null);
+
+      try {
+        const query = encodeURIComponent([address, city, country].join(', '));
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${query}`);
+        const results = await response.json();
+        const firstResult = Array.isArray(results) ? results[0] : null;
+
+        if (!firstResult?.lat || !firstResult?.lon) {
+          setGeocodeError('Unable to resolve this address.');
+          return;
+        }
+
+        setPopForm((current) => ({
+          ...current,
+          latitude: String(firstResult.lat),
+          longitude: String(firstResult.lon),
+        }));
+      } catch (_error) {
+        setGeocodeError('Address lookup failed. Please enter coordinates manually.');
+      } finally {
+        setGeocodeLoading(false);
+      }
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [dialogOpen, editingPop, popForm.address, popForm.city, popForm.country, popForm.latitude, popForm.longitude]);
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
-    const formData = new FormData(event.target as HTMLFormElement);
-    const data = Object.fromEntries(formData.entries());
+    const data = { ...popForm };
 
     try {
       if (editingPop) {
@@ -148,7 +226,7 @@ const Pops: React.FC = () => {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon />
+                  <MaterialSymbol name="search" />
                 </InputAdornment>
               ),
               endAdornment: searchName && (
@@ -158,7 +236,7 @@ const Pops: React.FC = () => {
                     onClick={() => setSearchName('')}
                     edge="end"
                   >
-                    <ClearIcon />
+                    <MaterialSymbol name="close" />
                   </IconButton>
                 </InputAdornment>
               ),
@@ -167,7 +245,7 @@ const Pops: React.FC = () => {
           <Button
             variant="contained"
             color="primary"
-            onClick={() => setDialogOpen(true)}
+            onClick={handleCreate}
           >
             Add New POP
           </Button>
@@ -215,7 +293,8 @@ const Pops: React.FC = () => {
               label="Name"
               type="text"
               fullWidth
-              defaultValue={editingPop?.name || ''}
+              value={popForm.name || ''}
+              onChange={(e) => setPopForm((current) => ({ ...current, name: e.target.value }))}
               required
             />
             <TextField
@@ -224,7 +303,8 @@ const Pops: React.FC = () => {
               label="Address"
               type="text"
               fullWidth
-              defaultValue={editingPop?.address || ''}
+              value={popForm.address || ''}
+              onChange={(e) => setPopForm((current) => ({ ...current, address: e.target.value }))}
               required
             />
             <TextField
@@ -233,7 +313,8 @@ const Pops: React.FC = () => {
               label="Postal Code"
               type="text"
               fullWidth
-              defaultValue={editingPop?.postal_code || ''}
+              value={popForm.postal_code || ''}
+              onChange={(e) => setPopForm((current) => ({ ...current, postal_code: e.target.value }))}
             />
             <TextField
               margin="dense"
@@ -241,7 +322,8 @@ const Pops: React.FC = () => {
               label="City"
               type="text"
               fullWidth
-              defaultValue={editingPop?.city || ''}
+              value={popForm.city || ''}
+              onChange={(e) => setPopForm((current) => ({ ...current, city: e.target.value }))}
               required
             />
             <TextField
@@ -250,7 +332,8 @@ const Pops: React.FC = () => {
               label="Province"
               type="text"
               fullWidth
-              defaultValue={editingPop?.province || ''}
+              value={popForm.province || ''}
+              onChange={(e) => setPopForm((current) => ({ ...current, province: e.target.value }))}
             />
             <TextField
               margin="dense"
@@ -258,7 +341,8 @@ const Pops: React.FC = () => {
               label="Country"
               type="text"
               fullWidth
-              defaultValue={editingPop?.country || ''}
+              value={popForm.country || ''}
+              onChange={(e) => setPopForm((current) => ({ ...current, country: e.target.value }))}
               required
             />
             <TextField
@@ -267,7 +351,10 @@ const Pops: React.FC = () => {
               label="Latitude"
               type="text"
               fullWidth
-              defaultValue={editingPop?.latitude || ''}
+              value={popForm.latitude || ''}
+              onChange={(e) => setPopForm((current) => ({ ...current, latitude: e.target.value }))}
+              helperText={geocodeLoading ? 'Resolving address...' : geocodeError || ' '}
+              error={Boolean(geocodeError)}
             />
             <TextField
               margin="dense"
@@ -275,8 +362,35 @@ const Pops: React.FC = () => {
               label="Longitude"
               type="text"
               fullWidth
-              defaultValue={editingPop?.longitude || ''}
+              value={popForm.longitude || ''}
+              onChange={(e) => setPopForm((current) => ({ ...current, longitude: e.target.value }))}
             />
+            {popForm.latitude && popForm.longitude && !Number.isNaN(Number(popForm.latitude)) && !Number.isNaN(Number(popForm.longitude)) && (
+              <Box sx={{ mt: 2 }}>
+                <PopMap
+                  pops={[
+                    {
+                      id: 'preview',
+                      name: popForm.name || 'POP Location',
+                      address: popForm.address,
+                      city: popForm.city,
+                      country: popForm.country,
+                      latitude: Number(popForm.latitude),
+                      longitude: Number(popForm.longitude),
+                    },
+                  ]}
+                  height={240}
+                  draggableMarkers
+                  onMarkerDragEnd={(_pop, latitude, longitude) =>
+                    setPopForm((current) => ({
+                      ...current,
+                      latitude: latitude.toFixed(6),
+                      longitude: longitude.toFixed(6),
+                    }))
+                  }
+                />
+              </Box>
+            )}
           </DialogContent>
           <DialogActions>
             <Button onClick={handleClose}>Cancel</Button>

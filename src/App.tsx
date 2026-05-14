@@ -3,19 +3,24 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { AuthProvider, useAuth } from './contexts/AuthContext.tsx';
+import { ResultBarProvider } from './contexts/ResultBarContext.tsx';
 import theme from './theme.ts';
 
 // Pages
 import Login from './pages/Login.tsx';
 import Dashboard from './pages/Dashboard.tsx';
 import Pops from './pages/Pops.tsx';
+import Bngs from './pages/Bngs.tsx';
 import Olts from './pages/Olts.tsx';
 import OltSettings from './pages/OltConfiguration.tsx';
+import OltRenderedConfigurations from './pages/OltRenderedConfigurations.tsx';
+import OltRenderedConfigurationDetails from './pages/OltRenderedConfigurationDetails.tsx';
 import Onts from './pages/Onts.tsx';
 import Switches from './pages/Switches.tsx';
 import Users from './pages/Users.tsx';
 import Settings from './pages/Settings.tsx';
 import EmailTemplates from './pages/EmailTemplates.tsx';
+import ConfigTemplates from './pages/ConfigTemplates.tsx';
 import ResetPassword from './pages/ResetPassword.tsx';
 import About from './pages/About.tsx';
 import DeviceModels from './pages/DeviceModels.tsx';
@@ -37,9 +42,10 @@ const App: React.FC = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <Router>
-            <Routes>
+        <ResultBarProvider>
+          <AuthProvider>
+            <Router>
+              <Routes>
               <Route path="/login" element={<Login />} />
               <Route path="/reset_password" element={<ResetPassword />} />
               <Route
@@ -59,6 +65,14 @@ const App: React.FC = () => {
                 }
               />
               <Route
+                path="/bngs/*"
+                element={
+                  <PrivateRoute>
+                    <Bngs />
+                  </PrivateRoute>
+                }
+              />
+              <Route
                 path="/olts/*"
                 element={
                   <PrivateRoute>
@@ -71,6 +85,22 @@ const App: React.FC = () => {
                 element={
                   <PrivateRoute>
                     <OltSettings />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/olts/:id/rendered-configurations"
+                element={
+                  <PrivateRoute>
+                    <OltRenderedConfigurations />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/olts/:id/rendered-configurations/:renderedId"
+                element={
+                  <PrivateRoute>
+                    <OltRenderedConfigurationDetails />
                   </PrivateRoute>
                 }
               />
@@ -123,6 +153,14 @@ const App: React.FC = () => {
                 }
               />
               <Route
+                path="/config-templates/*"
+                element={
+                  <PrivateRoute>
+                    <ConfigTemplates />
+                  </PrivateRoute>
+                }
+              />
+              <Route
                 path="/device-models/:modelType"
                 element={
                   <PrivateRoute>
@@ -130,9 +168,10 @@ const App: React.FC = () => {
                   </PrivateRoute>
                 }
               />
-            </Routes>
-          </Router>
-        </AuthProvider>
+              </Routes>
+            </Router>
+          </AuthProvider>
+        </ResultBarProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import MaterialSymbol from '../components/MaterialSymbol.tsx';
 import { useQuery } from '@tanstack/react-query';
 import {
   Alert,
@@ -15,8 +16,6 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
@@ -283,7 +282,7 @@ const Switches: React.FC = () => {
                         onMouseDown={(event) => event.preventDefault()}
                         edge="end"
                       >
-                        {showUsername ? <VisibilityOff /> : <Visibility />}
+                        {showUsername ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}
                       </IconButton>
                     </InputAdornment>
                   ),
@@ -305,7 +304,7 @@ const Switches: React.FC = () => {
                         onMouseDown={(event) => event.preventDefault()}
                         edge="end"
                       >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                        {showPassword ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}
                       </IconButton>
                     </InputAdornment>
                   ),

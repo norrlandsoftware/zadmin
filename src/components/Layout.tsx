@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import MaterialSymbol from './MaterialSymbol.tsx';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   AppBar,
@@ -15,20 +16,6 @@ import {
   Typography,
   Button,
 } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import LocationOnIcon from '@mui/icons-material/LocationOn';
-import RouterIcon from '@mui/icons-material/Router';
-import DeviceHubIcon from '@mui/icons-material/DeviceHub';
-import SettingsEthernetIcon from '@mui/icons-material/SettingsEthernet';
-import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import PeopleIcon from '@mui/icons-material/People';
-import SettingsIcon from '@mui/icons-material/Settings';
-import EmailIcon from '@mui/icons-material/Email';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import DeveloperBoardIcon from '@mui/icons-material/DeveloperBoard';
 import { useAuth } from '../contexts/AuthContext.tsx';
 
 const drawerWidth = 240;
@@ -42,30 +29,45 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
   const location = useLocation();
   const isDeviceModelsRoute = location.pathname.startsWith('/device-models');
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [adminOpen, setAdminOpen] = useState(isDeviceModelsRoute);
-  const [deviceModelsOpen, setDeviceModelsOpen] = useState(isDeviceModelsRoute);
+  const [adminOpen, setAdminOpen] = useState(() => {
+    const stored = localStorage.getItem('layout.adminOpen');
+    if (stored != null) {
+      return stored === 'true';
+    }
+    return isDeviceModelsRoute;
+  });
+  const [deviceModelsOpen, setDeviceModelsOpen] = useState(() => {
+    const stored = localStorage.getItem('layout.deviceModelsOpen');
+    if (stored != null) {
+      return stored === 'true';
+    }
+    return isDeviceModelsRoute;
+  });
   const { logout } = useAuth();
   const navigate = useNavigate();
 
   const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/' },
-    { text: 'POPs', icon: <LocationOnIcon />, path: '/pops' },
-    { text: 'OLTs', icon: <DeviceHubIcon />, path: '/olts' },
-    { text: 'ONTs', icon: <RouterIcon />, path: '/onts' },
-    { text: 'Switch', icon: <SettingsEthernetIcon />, path: '/switches' },
+    { text: 'Dashboard', icon: <MaterialSymbol name="dashboard" />, path: '/' },
+    { text: 'POPs', icon: <MaterialSymbol name="location_on" />, path: '/pops' },
+    { text: 'BNG', icon: <MaterialSymbol name="captive_portal" />, path: '/bngs' },
+    { text: 'OLTs', icon: <MaterialSymbol name="device_hub" />, path: '/olts' },
+    { text: 'ONTs', icon: <MaterialSymbol name="router" />, path: '/onts' },
+    { text: 'Switch', icon: <MaterialSymbol name="settings_ethernet" />, path: '/switches' },
   ];
 
   const adminMenuItems = [
-    { text: 'About', icon: <InfoOutlinedIcon />, path: '/about' },
-    { text: 'Email Templates', icon: <EmailIcon />, path: '/email-templates' },
-    { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
-    { text: 'Users', icon: <PeopleIcon />, path: '/users' },
+    { text: 'About', icon: <MaterialSymbol name="info" />, path: '/about' },
+    { text: 'Email Templates', icon: <MaterialSymbol name="email" />, path: '/email-templates' },
+    { text: 'Config Templates', icon: <MaterialSymbol name="dashboard_2_gear" />, path: '/config-templates' },
+    { text: 'Settings', icon: <MaterialSymbol name="settings" />, path: '/settings' },
+    { text: 'Users', icon: <MaterialSymbol name="people" />, path: '/users' },
   ];
 
   const deviceModelMenuItems = [
     { text: 'OLT', path: '/device-models/olt' },
     { text: 'OLT Line Card', path: '/device-models/olt-line-card' },
     { text: 'OLT Uplink Card', path: '/device-models/olt-uplink-card' },
+    { text: 'BNG', path: '/device-models/bng' },
     { text: 'Switch', path: '/device-models/switch' },
   ];
 
@@ -74,11 +76,19 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
   };
 
   const handleAdminToggle = () => {
-    setAdminOpen((current) => !current);
+    setAdminOpen((current) => {
+      const next = !current;
+      localStorage.setItem('layout.adminOpen', String(next));
+      return next;
+    });
   };
 
   const handleDeviceModelsToggle = () => {
-    setDeviceModelsOpen((current) => !current);
+    setDeviceModelsOpen((current) => {
+      const next = !current;
+      localStorage.setItem('layout.deviceModelsOpen', String(next));
+      return next;
+    });
   };
 
   const drawer = (
@@ -106,10 +116,10 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
         ))}
         <ListItem button onClick={handleAdminToggle}>
           <ListItemIcon sx={{ color: 'primary.main' }}>
-            <AdminPanelSettingsIcon />
+            <MaterialSymbol name="admin_panel_settings" />
           </ListItemIcon>
           <ListItemText primary="Admin" />
-          {adminOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+          {adminOpen ? <MaterialSymbol name="expand_less" /> : <MaterialSymbol name="expand_more" />}
         </ListItem>
         <Collapse in={adminOpen} timeout="auto" unmountOnExit={false}>
           <List component="div" disablePadding>
@@ -122,7 +132,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
               }}
             >
               <ListItemIcon sx={{ minWidth: 36, color: 'primary.main' }}>
-                <InfoOutlinedIcon />
+                <MaterialSymbol name="info" />
               </ListItemIcon>
               <ListItemText
                 primary="About"
@@ -131,13 +141,13 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
             </ListItem>
             <ListItem button sx={{ pl: 4 }} onClick={handleDeviceModelsToggle}>
               <ListItemIcon sx={{ minWidth: 36, color: 'primary.main' }}>
-                <DeveloperBoardIcon />
+                <MaterialSymbol name="developer_board" />
               </ListItemIcon>
               <ListItemText
                 primary="Device Models"
                 primaryTypographyProps={{ fontSize: '0.875rem' }}
               />
-              {deviceModelsOpen ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+              {deviceModelsOpen ? <MaterialSymbol name="expand_less" /> : <MaterialSymbol name="expand_more" />}
             </ListItem>
             <Collapse in={deviceModelsOpen} timeout="auto" unmountOnExit={false}>
               <List component="div" disablePadding>
@@ -207,7 +217,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
             onClick={handleDrawerToggle}
             sx={{ mr: 2, display: { sm: 'none' } }}
           >
-            <MenuIcon />
+            <MaterialSymbol name="menu" />
           </IconButton>
           <Box sx={{ flexGrow: 1, minWidth: 0 }}>
             <Typography variant="subtitle1" noWrap component="div" sx={{ fontWeight: 700, lineHeight: 1.2 }}>

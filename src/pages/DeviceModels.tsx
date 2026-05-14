@@ -18,6 +18,7 @@ import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
 import {
+  bngModels,
   oltLineCardModels,
   oltModels,
   oltUplinkCardModels,
@@ -38,6 +39,8 @@ interface DeviceModelConfig {
   title: string;
   singular: string;
   queryKey: string;
+  allowCreate?: boolean;
+  allowEdit?: boolean;
   api: {
     getAll: (params?: any) => Promise<any>;
     create: (data: any) => Promise<any>;
@@ -59,9 +62,6 @@ const formatBoolean = (value: boolean | null | undefined) => {
 const formatOptional = (value: string | number | null | undefined) =>
   value === null || value === undefined || value === '' ? 'N/A' : String(value);
 
-const formatCompatibleModels = (value: string | null | undefined) =>
-  value === null || value === undefined || value === '' ? 'All OLT models' : value;
-
 const commonFields: DeviceModelField[] = [
   { name: 'name', label: 'Name', required: true },
   { name: 'vendor', label: 'Vendor', required: true },
@@ -73,6 +73,8 @@ const deviceModelConfigs: Record<string, DeviceModelConfig> = {
     title: 'OLT Models',
     singular: 'OLT Model',
     queryKey: 'olt-models',
+    allowCreate: false,
+    allowEdit: false,
     api: oltModels,
     fields: [
       { name: 'name', label: 'Name', required: true },
@@ -98,6 +100,8 @@ const deviceModelConfigs: Record<string, DeviceModelConfig> = {
     title: 'OLT Line Card Models',
     singular: 'OLT Line Card Model',
     queryKey: 'olt-line-card-models',
+    allowCreate: false,
+    allowEdit: false,
     api: oltLineCardModels,
     fields: [
       ...commonFields.slice(0, 2),
@@ -110,8 +114,6 @@ const deviceModelConfigs: Record<string, DeviceModelConfig> = {
       { id: 'name', label: 'Name' },
       { id: 'vendor', label: 'Vendor' },
       { id: 'number_of_pon_ports', label: 'PON Ports', format: formatOptional },
-      { id: 'number_of_xgspon_ports', label: 'XGSPON Ports', format: formatOptional },
-      { id: 'compatible_olt_models', label: 'Compatible OLT Models', format: formatCompatibleModels },
       { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
     ],
   },
@@ -119,6 +121,8 @@ const deviceModelConfigs: Record<string, DeviceModelConfig> = {
     title: 'OLT Uplink Card Models',
     singular: 'OLT Uplink Card Model',
     queryKey: 'olt-uplink-card-models',
+    allowCreate: false,
+    allowEdit: false,
     api: oltUplinkCardModels,
     fields: [
       ...commonFields.slice(0, 2),
@@ -128,7 +132,6 @@ const deviceModelConfigs: Record<string, DeviceModelConfig> = {
     columns: [
       { id: 'name', label: 'Name' },
       { id: 'vendor', label: 'Vendor' },
-      { id: 'compatible_olt_models', label: 'Compatible OLT Models', format: formatCompatibleModels },
       { id: 'description', label: 'Description', format: formatOptional },
       { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
     ],
@@ -137,6 +140,8 @@ const deviceModelConfigs: Record<string, DeviceModelConfig> = {
     title: 'Switch Models',
     singular: 'Switch Model',
     queryKey: 'switch-models',
+    allowCreate: false,
+    allowEdit: false,
     api: switchModels,
     fields: [
       ...commonFields,
@@ -146,6 +151,23 @@ const deviceModelConfigs: Record<string, DeviceModelConfig> = {
       { id: 'name', label: 'Name' },
       { id: 'vendor', label: 'Vendor' },
       { id: 'number_of_port', label: 'Ports', format: formatOptional },
+      { id: 'description', label: 'Description', format: formatOptional },
+      { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
+    ],
+  },
+  bng: {
+    title: 'BNG Models',
+    singular: 'BNG Model',
+    queryKey: 'bng-models',
+    allowCreate: false,
+    allowEdit: false,
+    api: bngModels,
+    fields: [
+      ...commonFields,
+    ],
+    columns: [
+      { id: 'name', label: 'Name' },
+      { id: 'vendor', label: 'Vendor' },
       { id: 'description', label: 'Description', format: formatOptional },
       { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
     ],
@@ -215,6 +237,11 @@ const DeviceModels: React.FC = () => {
     { enabled: shouldLoadOltModels }
   );
 
+  const oltModelById = useMemo(
+    () => new Map((oltModelsData?.data || []).map((model: any) => [model.id, model])),
+    [oltModelsData]
+  );
+
   const oltModelNameById = useMemo(
     () => new Map((oltModelsData?.data || []).map((model: any) => [model.id, model.name])),
     [oltModelsData]
@@ -241,27 +268,74 @@ const DeviceModels: React.FC = () => {
     [data, formatOltModelIds, shouldLoadOltModels]
   );
 
-  if (!config) {
-    return <Navigate to="/device-models/olt" replace />;
-  }
-
   const openCreateDialog = () => {
     setEditingModel(null);
     setFormError(null);
     setDialogOpen(true);
   };
 
-  const handleView = (model: any) => {
-    if (shouldLoadOltModels) {
-      const modelWithNames = {
-        ...model,
-        compatible_olt_models: formatOltModelIds(model.olt_model_ids),
-      };
-      delete modelWithNames.olt_model_ids;
-      setViewingModel(modelWithNames);
-    } else {
-      setViewingModel(model);
+  const buildModelDetails = useCallback((model: any) => {
+    const details = { ...model };
+
+    if (modelType === 'olt') {
+      const ports: Record<string, any> = {};
+      const slots: Record<string, any> = {};
+
+      if ('number_of_pon_ports' in details) ports.pon_ports = details.number_of_pon_ports;
+      if ('number_of_xgspon_ports' in details) ports.xgspon_ports = details.number_of_xgspon_ports;
+      if ('number_of_uplink_ports' in details) ports.uplink_ports = details.number_of_uplink_ports;
+      if ('number_of_pon_slots' in details) slots.pon_slots = details.number_of_pon_slots;
+      if ('number_of_uplink_slots' in details) slots.uplink_slots = details.number_of_uplink_slots;
+
+      delete details.compatible_olt_models;
+      delete details.number_of_pon_ports;
+      delete details.number_of_xgspon_ports;
+      delete details.number_of_uplink_ports;
+      delete details.number_of_pon_slots;
+      delete details.number_of_uplink_slots;
+
+      details.ports = ports;
+      details.slots = slots;
     }
+
+    if (modelType === 'olt-line-card' || modelType === 'olt-uplink-card') {
+      const explicitCodes: string[] = Array.isArray(model.olt_model_codes) ? model.olt_model_codes : [];
+      const supportedIds: string[] = Array.isArray(model.olt_model_ids) ? model.olt_model_ids : [];
+      const supportedCodes = explicitCodes.length > 0
+        ? explicitCodes
+        : supportedIds.length > 0
+          ? supportedIds.map((supportedId) => {
+              const supportedModel = oltModelById.get(supportedId as any);
+              return supportedModel?.code || supportedModel?.name || supportedId;
+            })
+          : ['All OLT models supported'];
+
+      details.supported_olt_model_codes = supportedCodes.join(', ');
+    }
+
+    if (modelType === 'olt-line-card' || modelType === 'olt-uplink-card' || modelType === 'bng') {
+      delete details.compatible_olt_models;
+      delete details.olt_model_ids;
+      delete details.olt_model_codes;
+    }
+
+    if ('code' in details) {
+      const codeValue = details.code;
+      delete details.code;
+      details.code = codeValue;
+    }
+
+    return details;
+  }, [modelType, oltModelById]);
+
+  const handleView = (model: any) => {
+    const modelWithNames = shouldLoadOltModels
+      ? {
+          ...model,
+          compatible_olt_models: formatOltModelIds(model.olt_model_ids),
+        }
+      : model;
+    setViewingModel(buildModelDetails(modelWithNames));
     setDetailDialogOpen(true);
   };
 
@@ -375,6 +449,10 @@ const DeviceModels: React.FC = () => {
     );
   };
 
+  if (!config) {
+    return <Navigate to="/device-models/olt" replace />;
+  }
+
   if (isLoading || (shouldLoadOltModels && isOltModelsLoading)) {
     return (
       <Layout title={config.title}>
@@ -386,9 +464,11 @@ const DeviceModels: React.FC = () => {
   return (
     <Layout title={config.title}>
       <Box sx={{ mb: 4 }}>
-        <Button variant="contained" color="primary" onClick={openCreateDialog}>
-          Add {config.singular}
-        </Button>
+        {config.allowCreate !== false && (
+          <Button variant="contained" color="primary" onClick={openCreateDialog}>
+            Add {config.singular}
+          </Button>
+        )}
       </Box>
 
       <DataTable
@@ -400,7 +480,7 @@ const DeviceModels: React.FC = () => {
         onPageChange={setPage}
         onRowsPerPageChange={setRowsPerPage}
         onRowClick={handleView}
-        onEdit={handleEdit}
+        onEdit={config.allowEdit === false ? undefined : handleEdit}
       />
 
       <Dialog open={dialogOpen} onClose={handleClose} maxWidth="sm" fullWidth>

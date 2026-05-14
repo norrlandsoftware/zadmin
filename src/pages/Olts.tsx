@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import MaterialSymbol from '../components/MaterialSymbol.tsx';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -14,17 +15,12 @@ import {
   InputAdornment,
   IconButton,
   Typography,
-  Snackbar,
   Alert,
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import ClearIcon from '@mui/icons-material/Clear';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import { useResultBar } from '../contexts/ResultBarContext.tsx';
 import { olts, oltModels, pops } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
@@ -56,12 +52,13 @@ const Olts: React.FC = () => {
   const [showUsername, setShowUsername] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [testingOlt, setTestingOlt] = useState(false);
-  const [reachabilityMessage, setReachabilityMessage] = useState('');
-  const [reachabilitySeverity, setReachabilitySeverity] = useState<'success' | 'error'>('success');
   const [formError, setFormError] = useState<string | null>(null);
   const [selectedModelId, setSelectedModelId] = useState('');
+  const [isNavigatingToSettings, setIsNavigatingToSettings] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { pushResult } = useResultBar();
 
   // Debounce search input
   useEffect(() => {
@@ -82,13 +79,25 @@ const Olts: React.FC = () => {
     }),
     {
       keepPreviousData: true,
+      enabled: !isNavigatingToSettings,
+      refetchOnWindowFocus: false,
     }
   );
 
-  const { data: popsData } = useQuery(['pops'], () => pops.getAll({ size: 1000 }));
+  const { data: popsData } = useQuery(
+    ['pops'],
+    () => pops.getAll({ size: 1000 }),
+    {
+      enabled: !isNavigatingToSettings,
+      refetchOnWindowFocus: false,
+    }
+  );
   const { data: oltModelsData } = useQuery(['olt-models-list'], () =>
     oltModels.getAll({ size: 1000, sort: 'name' })
-  );
+  , {
+    enabled: !isNavigatingToSettings,
+    refetchOnWindowFocus: false,
+  });
 
   const popNameById = useMemo(
     () => new Map((popsData?.data || []).map((pop: any) => [pop.id, pop.name])),
@@ -164,8 +173,18 @@ const Olts: React.FC = () => {
     setDialogOpen(true);
   };
 
-  const handleConfigure = (olt: any) => {
+  const handleConfigure = async (olt: any) => {
+    setIsNavigatingToSettings(true);
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: ['olts'] }),
+      queryClient.cancelQueries({ queryKey: ['pops'] }),
+      queryClient.cancelQueries({ queryKey: ['olt-models-list'] }),
+    ]);
     navigate(`/olts/${olt.id}/settings`);
+  };
+
+  const handleViewRenderedConfigurations = (olt: any) => {
+    navigate(`/olts/${olt.id}/rendered-configurations`);
   };
 
   const handleClose = () => {
@@ -189,6 +208,7 @@ const Olts: React.FC = () => {
       logging_type: nullableString(formData.get('logging_type')) || 'syslog',
       ip_address_v4: nullableString(formData.get('ip_address_v4')),
       sntp_ip_address: nullableString(formData.get('sntp_ip_address')),
+      syslog_ip_address: nullableString(formData.get('syslog_ip_address')),
       area: nullableString(formData.get('area')),
       pop_id: nullableString(formData.get('pop_id')),
       username: formData.get('username'),
@@ -222,16 +242,15 @@ const Olts: React.FC = () => {
       const reachable = Boolean(result.reachable);
       const oltName = viewingOlt.name || 'selected OLT';
 
-      setReachabilityMessage(
+      pushResult(
+        reachable ? 'success' : 'error',
         reachable
           ? `The OLT ${oltName} is reachable`
           : `The OLT ${oltName} is NOT reachable`
       );
-      setReachabilitySeverity(reachable ? 'success' : 'error');
     } catch (error) {
       console.error('Error testing OLT reachability:', error);
-      setReachabilityMessage(`Unable to test OLT ${viewingOlt.name || 'selected OLT'}`);
-      setReachabilitySeverity('error');
+      pushResult('error', `Unable to test OLT ${viewingOlt.name || 'selected OLT'}`);
     } finally {
       setTestingOlt(false);
     }
@@ -258,7 +277,7 @@ const Olts: React.FC = () => {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon />
+                  <MaterialSymbol name="search" />
                 </InputAdornment>
               ),
               endAdornment: searchName && (
@@ -268,7 +287,7 @@ const Olts: React.FC = () => {
                     onClick={() => setSearchName('')}
                     edge="end"
                   >
-                    <ClearIcon />
+                    <MaterialSymbol name="close" />
                   </IconButton>
                 </InputAdornment>
               ),
@@ -299,6 +318,7 @@ const Olts: React.FC = () => {
         onRowsPerPageChange={setRowsPerPage}
         onRowClick={handleView}
         onConfigure={handleConfigure}
+        onDocument={handleViewRenderedConfigurations}
         isConfigureDisabled={(olt: any) => !olt.model_id}
         onEdit={handleEdit}
       />
@@ -380,6 +400,14 @@ const Olts: React.FC = () => {
             />
             <TextField
               margin="dense"
+              name="syslog_ip_address"
+              label="Syslog IP Address"
+              type="text"
+              fullWidth
+              defaultValue={editingOlt?.syslog_ip_address || ''}
+            />
+            <TextField
+              margin="dense"
               name="area"
               label="Area"
               type="text"
@@ -423,7 +451,7 @@ const Olts: React.FC = () => {
                         onMouseDown={(event) => event.preventDefault()}
                         edge="end"
                       >
-                        {showUsername ? <VisibilityOff /> : <Visibility />}
+                        {showUsername ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}
                       </IconButton>
                     </InputAdornment>
                   ),
@@ -446,7 +474,7 @@ const Olts: React.FC = () => {
                         onMouseDown={(event) => event.preventDefault()}
                         edge="end"
                       >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                        {showPassword ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}
                       </IconButton>
                     </InputAdornment>
                   ),
@@ -500,7 +528,7 @@ const Olts: React.FC = () => {
           viewingOlt?.pop_name && viewingOlt?.pop_name !== 'N/A'
             ? {
                 pop_name: {
-                  icon: <OpenInNewIcon fontSize="small" />,
+                  icon: <MaterialSymbol name="open_in_new" fontSize="small" />,
                   label: 'Open POP details',
                   onClick: () => {
                     const targetOlt = data?.data.find((olt: any) => olt.id === viewingOlt.id);
@@ -520,21 +548,6 @@ const Olts: React.FC = () => {
         }
       />
 
-      <Snackbar
-        open={Boolean(reachabilityMessage)}
-        autoHideDuration={6000}
-        onClose={() => setReachabilityMessage('')}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setReachabilityMessage('')}
-          severity={reachabilitySeverity}
-          variant="filled"
-          sx={{ width: '100%' }}
-        >
-          {reachabilityMessage}
-        </Alert>
-      </Snackbar>
     </Layout>
   );
 };

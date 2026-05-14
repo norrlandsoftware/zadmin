@@ -109,6 +109,10 @@ export const olts = {
     const response = await api.get(`/olt/${id}/is_reachable`);
     return response.data;
   },
+  renderConfig: async (id: string) => {
+    const response = await api.post(`/olt/${id}/render_config`);
+    return response.data;
+  },
 };
 
 export const oltSettings = {
@@ -226,6 +230,25 @@ export const emailTemplates = {
   },
 };
 
+export const configTemplates = {
+  getAll: async (params?: any) => {
+    const response = await api.get('/config_template/', { params });
+    return response.data;
+  },
+  getById: async (id: string) => {
+    const response = await api.get(`/config_template/${id}/`);
+    return response.data;
+  },
+  create: async (data: any) => {
+    const response = await api.post('/config_template/', data);
+    return response.data;
+  },
+  update: async (id: string, data: any) => {
+    const response = await api.put(`/config_template/${id}/`, data);
+    return response.data;
+  },
+};
+
 const createCrudApi = (path: string) => ({
   getAll: async (params?: any) => {
     const response = await api.get(`${path}/`, { params });
@@ -247,6 +270,9 @@ const createCrudApi = (path: string) => ({
 
 export const oltModels = createCrudApi('/olt_model');
 export const oltLineCardModels = createCrudApi('/olt_line_card_model');
-export const oltUplinkCardModels = createCrudApi('/olt_uplink_model');
+export const oltUplinkCardModels = createCrudApi('/olt_uplink_card_model');
+export const bngModels = createCrudApi('/bng_model');
 export const switchModels = createCrudApi('/switch_model');
+export const bngs = createCrudApi('/bng');
 export const switches = createCrudApi('/switch');
+export const oltRenderedConfigurations = createCrudApi('/olt_rendered_config');
