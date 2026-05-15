@@ -24,9 +24,18 @@ interface Pop {
 interface PopMapProps {
   pops: Pop[];
   onPopClick?: (pop: Pop) => void;
+  draggableMarkers?: boolean;
+  onMarkerDragEnd?: (pop: Pop, latitude: number, longitude: number) => void;
+  height?: number | string;
 }
 
-const PopMap: React.FC<PopMapProps> = ({ pops, onPopClick }) => {
+const PopMap: React.FC<PopMapProps> = ({
+  pops,
+  onPopClick,
+  draggableMarkers = false,
+  onMarkerDragEnd,
+  height = 500,
+}) => {
   const mapRef = useRef<L.Map | null>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
 
@@ -57,7 +66,9 @@ const PopMap: React.FC<PopMapProps> = ({ pops, onPopClick }) => {
 
     if (validPops.length > 0) {
       validPops.forEach((pop) => {
-        const marker = L.marker([pop.latitude, pop.longitude])
+        const marker = L.marker([pop.latitude, pop.longitude], {
+          draggable: draggableMarkers,
+        })
           .addTo(mapRef.current!)
           .bindPopup(
             `<strong>${pop.name}</strong><br/>
@@ -67,6 +78,12 @@ const PopMap: React.FC<PopMapProps> = ({ pops, onPopClick }) => {
 
         if (onPopClick) {
           marker.on('click', () => onPopClick(pop));
+        }
+        if (draggableMarkers && onMarkerDragEnd) {
+          marker.on('dragend', (event) => {
+            const { lat, lng } = (event.target as L.Marker).getLatLng();
+            onMarkerDragEnd(pop, lat, lng);
+          });
         }
       });
 
@@ -84,14 +101,14 @@ const PopMap: React.FC<PopMapProps> = ({ pops, onPopClick }) => {
         mapRef.current = null;
       }
     };
-  }, [pops, onPopClick]);
+  }, [pops, onPopClick, draggableMarkers, onMarkerDragEnd]);
 
   return (
     <Paper elevation={2}>
       <Box
         ref={mapContainerRef}
         sx={{
-          height: '500px',
+          height,
           width: '100%',
           borderRadius: 1,
         }}

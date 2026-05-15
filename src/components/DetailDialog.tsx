@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import MaterialSymbol from './MaterialSymbol.tsx';
 import {
   Dialog,
   DialogTitle,
@@ -14,9 +15,6 @@ import {
   Divider,
   IconButton,
 } from '@mui/material';
-import MapIcon from '@mui/icons-material/Map';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import PopMap from './PopMap.tsx';
 
 interface DetailDialogFieldAction {
@@ -34,6 +32,7 @@ interface DetailDialogProps {
   fieldActions?: Record<string, DetailDialogFieldAction>;
   fullWidthFields?: string[];
   htmlPreviewFields?: string[];
+  preformattedFields?: string[];
 }
 
 const DetailDialog: React.FC<DetailDialogProps> = ({
@@ -45,17 +44,24 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   fieldActions,
   fullWidthFields = [],
   htmlPreviewFields = [],
+  preformattedFields = [],
 }) => {
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const [showUsername, setShowUsername] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [visibleConfigSecrets, setVisibleConfigSecrets] = useState<Record<string, boolean>>({});
+  const [jsonDialogOpen, setJsonDialogOpen] = useState(false);
+  const [jsonDialogTitle, setJsonDialogTitle] = useState('');
+  const [jsonDialogContent, setJsonDialogContent] = useState<any>(null);
 
   React.useEffect(() => {
     if (!open) {
       setShowUsername(false);
       setShowPassword(false);
       setVisibleConfigSecrets({});
+      setJsonDialogOpen(false);
+      setJsonDialogTitle('');
+      setJsonDialogContent(null);
     }
   }, [open, data]);
 
@@ -64,6 +70,8 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   const metadataKeys = ['id', 'created_at', 'updated_at'];
 
   const formatLabel = (key: string): string => {
+    if (key === 'compatible_olt_models_section') return 'Compatible OLT Models';
+    if (key === 'supported_olt_model_codes') return 'Supported OLT Model Codes';
     return key
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -139,19 +147,29 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   const renderField = (key: string, value: any) => (
     <Grid item xs={12} sm={fullWidthFields.includes(key) ? 12 : 6} key={key}>
       <Box>
-        <Typography 
-          variant="caption" 
-          color="primary.main"
-          sx={{ 
-            fontWeight: 600, 
-            textTransform: 'uppercase',
-            letterSpacing: 0.5,
-            display: 'block',
-            mb: 0.5
-          }}
-        >
-          {formatLabel(key)}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.5 }}>
+          <Typography
+            variant="caption"
+            color="primary.main"
+            sx={{
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              display: 'block',
+            }}
+          >
+            {formatLabel(key)}
+          </Typography>
+          {fieldActions?.[key] && (
+            <IconButton
+              size="small"
+              aria-label={fieldActions[key].label}
+              onClick={fieldActions[key].onClick}
+            >
+              {fieldActions[key].icon}
+            </IconButton>
+          )}
+        </Box>
         <Box 
           sx={{ 
             p: 1,
@@ -173,10 +191,53 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
             />
           ) : (
             <Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-                <Typography 
-                  variant="body1" 
-                  sx={{ 
+              {preformattedFields.includes(key) && typeof value === 'string' ? (
+                <Box sx={{ position: 'relative' }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      wordBreak: 'break-word',
+                      color: 'text.primary',
+                      fontSize: '0.8rem',
+                      whiteSpace: 'pre-wrap',
+                      lineHeight: 1.45,
+                      maxHeight: '7.8em',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      fontFamily:
+                        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                      pr: 4,
+                    }}
+                  >
+                    {value}
+                  </Typography>
+                  <IconButton
+                    size="small"
+                    aria-label="Expand text"
+                    onClick={() => {
+                      setJsonDialogTitle(formatLabel(key));
+                      setJsonDialogContent(value);
+                      setJsonDialogOpen(true);
+                    }}
+                    sx={{
+                      position: 'absolute',
+                      bottom: -4,
+                      right: -4,
+                      backgroundColor: 'background.paper',
+                      color: 'primary.main',
+                      '&:hover': {
+                        backgroundColor: 'action.hover',
+                      },
+                    }}
+                  >
+                    <MaterialSymbol name="expand_more" fontSize="small" />
+                  </IconButton>
+                </Box>
+              ) : (
+                <Typography
+                  variant="body1"
+                  component="div"
+                  sx={{
                     wordBreak: 'break-word',
                     color: value ? 'text.primary' : 'text.disabled',
                     flex: 1,
@@ -184,16 +245,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
                 >
                   {key === 'last_login' ? formatDateValue(value) : formatValue(value)}
                 </Typography>
-                {fieldActions?.[key] && (
-                  <IconButton
-                    size="small"
-                    aria-label={fieldActions[key].label}
-                    onClick={fieldActions[key].onClick}
-                  >
-                    {fieldActions[key].icon}
-                  </IconButton>
-                )}
-              </Box>
+              )}
               {htmlPreviewFields.includes(key) && typeof value === 'string' && value.trim() && (
                 <Box sx={{ mt: 2 }}>
                   <Typography
@@ -226,19 +278,29 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   const renderObjectField = (key: string, value: Record<string, any>) => (
     <Grid item xs={12} key={key}>
       <Box>
-        <Typography
-          variant="caption"
-          color="primary.main"
-          sx={{
-            fontWeight: 600,
-            textTransform: 'uppercase',
-            letterSpacing: 0.5,
-            display: 'block',
-            mb: 0.5,
-          }}
-        >
-          {formatLabel(key)}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.5 }}>
+          <Typography
+            variant="caption"
+            color="primary.main"
+            sx={{
+              fontWeight: 600,
+              textTransform: 'uppercase',
+              letterSpacing: 0.5,
+              display: 'block',
+            }}
+          >
+            {formatLabel(key)}
+          </Typography>
+          {fieldActions?.[key] && (
+            <IconButton
+              size="small"
+              aria-label={fieldActions[key].label}
+              onClick={fieldActions[key].onClick}
+            >
+              {fieldActions[key].icon}
+            </IconButton>
+          )}
+        </Box>
         <Box
           sx={{
             p: 1.5,
@@ -247,82 +309,124 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
             borderRadius: 1,
           }}
         >
-          <Grid container spacing={1.5}>
-            {Object.entries(value).length > 0 ? (
-              Object.entries(value).map(([objectKey, objectValue]) => {
-                const normalizedKey = objectKey.replace(/[\s_]/g, '').toLowerCase();
-                const isSensitiveConfigField =
-                  key === 'config' &&
-                  (normalizedKey === 'password' || normalizedKey === 'apikey');
-                const visibilityKey = `${key}.${objectKey}`;
-                const isVisible = !!visibleConfigSecrets[visibilityKey];
+          {key === 'context' ? (
+            <Box>
+              <Box sx={{ position: 'relative' }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    wordBreak: 'break-word',
+                    color: 'text.primary',
+                    fontSize: '0.8rem',
+                    whiteSpace: 'pre-wrap',
+                    maxHeight: '60px',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    pr: 4,
+                  }}
+                >
+                  {JSON.stringify(value, null, 2).substring(0, 140)}...
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={() => {
+                    setJsonDialogTitle(formatLabel(key));
+                    setJsonDialogContent(value);
+                    setJsonDialogOpen(true);
+                  }}
+                  sx={{
+                    position: 'absolute',
+                    bottom: -4,
+                    right: -4,
+                    backgroundColor: 'background.paper',
+                    color: 'primary.main',
+                    '&:hover': {
+                      backgroundColor: 'action.hover',
+                    },
+                  }}
+                >
+                  <MaterialSymbol name="expand_more" fontSize="small" />
+                </IconButton>
+              </Box>
+            </Box>
+          ) : (
+            <Grid container spacing={1.5}>
+              {Object.entries(value).length > 0 ? (
+                Object.entries(value).map(([objectKey, objectValue]) => {
+                  const normalizedKey = objectKey.replace(/[\s_]/g, '').toLowerCase();
+                  const isSensitiveConfigField =
+                    key === 'config' &&
+                    (normalizedKey === 'password' || normalizedKey === 'apikey');
+                  const visibilityKey = `${key}.${objectKey}`;
+                  const isVisible = !!visibleConfigSecrets[visibilityKey];
 
-                return (
-                  <Grid item xs={12} sm={6} key={objectKey}>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ display: 'block', mb: 0.25, fontWeight: 600 }}
-                    >
-                      {formatLabel(objectKey)}
-                    </Typography>
-                    {isSensitiveConfigField ? (
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 1,
-                        }}
+                  return (
+                    <Grid item xs={12} sm={6} key={objectKey}>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{ display: 'block', mb: 0.25, fontWeight: 600 }}
                       >
+                        {formatLabel(objectKey)}
+                      </Typography>
+                      {isSensitiveConfigField ? (
+                        <Box
+                          sx={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 1,
+                          }}
+                        >
+                          <Typography
+                            variant="body2"
+                            sx={{ wordBreak: 'break-word', color: 'text.primary', flex: 1 }}
+                          >
+                            {isVisible
+                              ? formatValue(objectValue)
+                              : objectValue !== null && objectValue !== undefined && objectValue !== ''
+                                ? '••••••••'
+                                : 'N/A'}
+                          </Typography>
+                          {(objectValue !== null && objectValue !== undefined && objectValue !== '') && (
+                            <IconButton
+                              size="small"
+                              aria-label={isVisible ? `Hide ${formatLabel(objectKey)}` : `Show ${formatLabel(objectKey)}`}
+                              onClick={() =>
+                                setVisibleConfigSecrets((prev) => ({
+                                  ...prev,
+                                  [visibilityKey]: !prev[visibilityKey],
+                                }))
+                              }
+                            >
+                              {isVisible ? (
+                                <MaterialSymbol name="visibility_off" fontSize="small" />
+                              ) : (
+                                <MaterialSymbol name="visibility" fontSize="small" />
+                              )}
+                            </IconButton>
+                          )}
+                        </Box>
+                      ) : (
                         <Typography
                           variant="body2"
-                          sx={{ wordBreak: 'break-word', color: 'text.primary', flex: 1 }}
+                          sx={{ wordBreak: 'break-word', color: 'text.primary' }}
                         >
-                          {isVisible
-                            ? formatValue(objectValue)
-                            : objectValue !== null && objectValue !== undefined && objectValue !== ''
-                              ? '••••••••'
-                              : 'N/A'}
+                          {formatValue(objectValue)}
                         </Typography>
-                        {(objectValue !== null && objectValue !== undefined && objectValue !== '') && (
-                          <IconButton
-                            size="small"
-                            aria-label={isVisible ? `Hide ${formatLabel(objectKey)}` : `Show ${formatLabel(objectKey)}`}
-                            onClick={() =>
-                              setVisibleConfigSecrets((prev) => ({
-                                ...prev,
-                                [visibilityKey]: !prev[visibilityKey],
-                              }))
-                            }
-                          >
-                            {isVisible ? (
-                              <VisibilityOff fontSize="small" />
-                            ) : (
-                              <Visibility fontSize="small" />
-                            )}
-                          </IconButton>
-                        )}
-                      </Box>
-                    ) : (
-                      <Typography
-                        variant="body2"
-                        sx={{ wordBreak: 'break-word', color: 'text.primary' }}
-                      >
-                        {formatValue(objectValue)}
-                      </Typography>
-                    )}
+                      )}
+                    </Grid>
+                  );
+                })
+              ) : (
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.disabled">
+                    N/A
+                  </Typography>
                   </Grid>
-                );
-              })
-            ) : (
-              <Grid item xs={12}>
-                <Typography variant="body2" color="text.disabled">
-                  N/A
-                </Typography>
-              </Grid>
-            )}
-          </Grid>
+              )}
+            </Grid>
+          )}
         </Box>
       </Box>
     </Grid>
@@ -381,7 +485,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
               aria-label={visible ? `Hide ${key}` : `Show ${key}`}
               onClick={onToggle}
             >
-              {visible ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
+              {visible ? <MaterialSymbol name="visibility_off" fontSize="small" /> : <MaterialSymbol name="visibility" fontSize="small" />}
             </IconButton>
           )}
         </Box>
@@ -403,7 +507,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
             <CardContent>
               <Grid container spacing={3}>
                 {contentEntries.map(([key, value]) =>
-                  key === 'config' && value && typeof value === 'object' && !Array.isArray(value)
+                  value && typeof value === 'object' && !Array.isArray(value)
                     ? renderObjectField(key, value as Record<string, any>)
                     : renderField(key, value)
                 )}
@@ -433,7 +537,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
                   <Button
                     variant="contained"
                     color="primary"
-                    startIcon={<MapIcon />}
+                    startIcon={<MaterialSymbol name="map" />}
                     onClick={() => setMapDialogOpen(true)}
                   >
                     Show Map
@@ -486,6 +590,42 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setMapDialogOpen(false)} variant="contained">
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={jsonDialogOpen} onClose={() => setJsonDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
+            <Typography variant="h6">{jsonDialogTitle}</Typography>
+            <IconButton
+              size="small"
+              onClick={() => navigator.clipboard.writeText(JSON.stringify(jsonDialogContent ?? {}, null, 2))}
+            >
+              <MaterialSymbol name="content_copy" fontSize="small" />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Box
+            sx={{
+              backgroundColor: 'grey.100',
+              p: 2,
+              borderRadius: 1,
+              overflow: 'auto',
+              maxHeight: '60vh',
+            }}
+          >
+            <pre style={{ margin: 0, fontSize: '0.875rem', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+              {typeof jsonDialogContent === 'string'
+                ? jsonDialogContent
+                : JSON.stringify(jsonDialogContent, null, 2)}
+            </pre>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setJsonDialogOpen(false)} variant="contained">
             Close
           </Button>
         </DialogActions>

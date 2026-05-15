@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useCallback, useMemo, useState, useEffect } from 'react';
+import MaterialSymbol from '../components/MaterialSymbol.tsx';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -14,27 +15,30 @@ import {
   InputAdornment,
   IconButton,
   Typography,
-  Snackbar,
   Alert,
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import ClearIcon from '@mui/icons-material/Clear';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
-import { olts, pops } from '../services/api.ts';
+import { useResultBar } from '../contexts/ResultBarContext.tsx';
+import { olts, oltModels, pops } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
-const columns = [
-  { id: 'name', label: 'Name' },
-  { id: 'vendor', label: 'Vendor' },
-  { id: 'model', label: 'Model' },
-  { id: 'ip_address_v4', label: 'IP Address' },
-  { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
-];
+const formatOptional = (value: string | null | undefined) =>
+  value === null || value === undefined || value === '' ? 'N/A' : value;
+
+const nullableString = (value: FormDataEntryValue | null) => {
+  if (value === null || value === '') {
+    return null;
+  }
+
+  return String(value);
+};
+
+const getErrorMessage = (error: any) =>
+  error?.response?.data?.detail?.[0]?.msg ||
+  error?.response?.data?.message ||
+  'Unable to save OLT.';
 
 const Olts: React.FC = () => {
   const [page, setPage] = useState(0);
@@ -48,10 +52,13 @@ const Olts: React.FC = () => {
   const [showUsername, setShowUsername] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [testingOlt, setTestingOlt] = useState(false);
-  const [reachabilityMessage, setReachabilityMessage] = useState('');
-  const [reachabilitySeverity, setReachabilitySeverity] = useState<'success' | 'error'>('success');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [selectedModelId, setSelectedModelId] = useState('');
+  const [isNavigatingToSettings, setIsNavigatingToSettings] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { pushResult } = useResultBar();
 
   // Debounce search input
   useEffect(() => {
@@ -72,10 +79,60 @@ const Olts: React.FC = () => {
     }),
     {
       keepPreviousData: true,
+      enabled: !isNavigatingToSettings,
+      refetchOnWindowFocus: false,
     }
   );
 
-  const { data: popsData } = useQuery(['pops'], () => pops.getAll());
+  const { data: popsData } = useQuery(
+    ['pops'],
+    () => pops.getAll({ size: 1000 }),
+    {
+      enabled: !isNavigatingToSettings,
+      refetchOnWindowFocus: false,
+    }
+  );
+  const { data: oltModelsData } = useQuery(['olt-models-list'], () =>
+    oltModels.getAll({ size: 1000, sort: 'name' })
+  , {
+    enabled: !isNavigatingToSettings,
+    refetchOnWindowFocus: false,
+  });
+
+  const popNameById = useMemo(
+    () => new Map((popsData?.data || []).map((pop: any) => [pop.id, pop.name])),
+    [popsData]
+  );
+
+  const modelNameById = useMemo(
+    () => new Map((oltModelsData?.data || []).map((model: any) => [model.id, model.name])),
+    [oltModelsData]
+  );
+
+  const columns = useMemo(
+    () => [
+      { id: 'name', label: 'Name' },
+      {
+        id: 'model_id',
+        label: 'Model',
+        format: (value: string) => formatOptional(modelNameById.get(value) || value),
+      },
+      { id: 'area', label: 'Area', format: formatOptional },
+      { id: 'ip_address_v4', label: 'IP Address', format: formatOptional },
+      { id: 'sntp_ip_address', label: 'SNTP IP', format: formatOptional },
+      { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
+    ],
+    [modelNameById]
+  );
+
+  const decorateOlt = useCallback(
+    (olt: any) => ({
+      ...olt,
+      model_name: modelNameById.get(olt.model_id) || 'N/A',
+      pop_name: popNameById.get(olt.pop_id) || 'N/A',
+    }),
+    [modelNameById, popNameById]
+  );
 
   useEffect(() => {
     const openOltId = location.state?.openOltId;
@@ -89,63 +146,87 @@ const Olts: React.FC = () => {
       return;
     }
 
-    const popName = popsData?.data.find((pop: any) => pop.id === matchedOlt.pop_id)?.name;
-    const oltWithPopName = {
-      ...matchedOlt,
-      pop_name: popName || 'N/A',
-    };
+    const oltWithNames = decorateOlt(matchedOlt);
 
-    delete oltWithPopName.pop_id;
+    delete oltWithNames.model_id;
+    delete oltWithNames.pop_id;
 
-    setViewingOlt(oltWithPopName);
+    setViewingOlt(oltWithNames);
     setDetailDialogOpen(true);
     navigate(location.pathname, { replace: true, state: {} });
-  }, [data, location.pathname, location.state, navigate, popsData]);
+  }, [data, decorateOlt, location.pathname, location.state, navigate]);
 
   const handleView = (olt: any) => {
-    // Find the POP name from the popsData
-    const popName = popsData?.data.find((pop: any) => pop.id === olt.pop_id)?.name;
-    
-    // Create a modified version of the OLT data with pop_name instead of pop_id
-    const oltWithPopName = {
-      ...olt,
-      pop_name: popName || 'N/A',
-    };
-    
-    // Remove pop_id from the display
-    delete oltWithPopName.pop_id;
-    
-    setViewingOlt(oltWithPopName);
+    const oltWithNames = decorateOlt(olt);
+
+    delete oltWithNames.model_id;
+    delete oltWithNames.pop_id;
+
+    setViewingOlt(oltWithNames);
     setDetailDialogOpen(true);
   };
 
   const handleEdit = (olt: any) => {
     setEditingOlt(olt);
+    setSelectedModelId(olt.model_id || '');
+    setFormError(null);
     setDialogOpen(true);
+  };
+
+  const handleConfigure = async (olt: any) => {
+    setIsNavigatingToSettings(true);
+    await Promise.all([
+      queryClient.cancelQueries({ queryKey: ['olts'] }),
+      queryClient.cancelQueries({ queryKey: ['pops'] }),
+      queryClient.cancelQueries({ queryKey: ['olt-models-list'] }),
+    ]);
+    navigate(`/olts/${olt.id}/settings`);
+  };
+
+  const handleViewRenderedConfigurations = (olt: any) => {
+    navigate(`/olts/${olt.id}/rendered-configurations`);
   };
 
   const handleClose = () => {
     setDialogOpen(false);
     setEditingOlt(null);
+    setFormError(null);
+    setSelectedModelId('');
     setShowUsername(false);
     setShowPassword(false);
   };
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
+    setFormError(null);
     const formData = new FormData(event.target as HTMLFormElement);
-    const data = Object.fromEntries(formData.entries());
+    const payload = {
+      name: formData.get('name'),
+      description: nullableString(formData.get('description')),
+      model_id: nullableString(formData.get('model_id')),
+      software_version: nullableString(formData.get('software_version')),
+      logging_type: nullableString(formData.get('logging_type')) || 'syslog',
+      ip_address_v4: nullableString(formData.get('ip_address_v4')),
+      sntp_ip_address: nullableString(formData.get('sntp_ip_address')),
+      syslog_ip_address: nullableString(formData.get('syslog_ip_address')),
+      area: nullableString(formData.get('area')),
+      pop_id: nullableString(formData.get('pop_id')),
+      username: formData.get('username'),
+      password: formData.get('password'),
+      enabled: formData.get('enabled') === 'true',
+    };
 
     try {
       if (editingOlt) {
-        await olts.update(editingOlt.id, data);
+        await olts.update(editingOlt.id, payload);
       } else {
-        await olts.create(data);
+        await olts.create(payload);
       }
       refetch();
       handleClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving OLT:', error);
+      setFormError(getErrorMessage(error));
     }
   };
 
@@ -161,16 +242,15 @@ const Olts: React.FC = () => {
       const reachable = Boolean(result.reachable);
       const oltName = viewingOlt.name || 'selected OLT';
 
-      setReachabilityMessage(
+      pushResult(
+        reachable ? 'success' : 'error',
         reachable
           ? `The OLT ${oltName} is reachable`
           : `The OLT ${oltName} is NOT reachable`
       );
-      setReachabilitySeverity(reachable ? 'success' : 'error');
     } catch (error) {
       console.error('Error testing OLT reachability:', error);
-      setReachabilityMessage(`Unable to test OLT ${viewingOlt.name || 'selected OLT'}`);
-      setReachabilitySeverity('error');
+      pushResult('error', `Unable to test OLT ${viewingOlt.name || 'selected OLT'}`);
     } finally {
       setTestingOlt(false);
     }
@@ -197,7 +277,7 @@ const Olts: React.FC = () => {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon />
+                  <MaterialSymbol name="search" />
                 </InputAdornment>
               ),
               endAdornment: searchName && (
@@ -207,7 +287,7 @@ const Olts: React.FC = () => {
                     onClick={() => setSearchName('')}
                     edge="end"
                   >
-                    <ClearIcon />
+                    <MaterialSymbol name="close" />
                   </IconButton>
                 </InputAdornment>
               ),
@@ -216,7 +296,12 @@ const Olts: React.FC = () => {
           <Button
             variant="contained"
             color="primary"
-            onClick={() => setDialogOpen(true)}
+            onClick={() => {
+              setEditingOlt(null);
+              setFormError(null);
+              setSelectedModelId('');
+              setDialogOpen(true);
+            }}
           >
             Add New OLT
           </Button>
@@ -232,15 +317,23 @@ const Olts: React.FC = () => {
         onPageChange={setPage}
         onRowsPerPageChange={setRowsPerPage}
         onRowClick={handleView}
+        onConfigure={handleConfigure}
+        onDocument={handleViewRenderedConfigurations}
+        isConfigureDisabled={(olt: any) => !olt.model_id}
         onEdit={handleEdit}
       />
 
-      <Dialog open={dialogOpen} onClose={handleClose}>
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth>
         <form onSubmit={handleSave}>
           <DialogTitle>
             {editingOlt ? 'Edit OLT' : 'Create New OLT'}
           </DialogTitle>
           <DialogContent>
+            {formError && (
+              <Alert severity="error" sx={{ mb: 2, mt: 1 }}>
+                {formError}
+              </Alert>
+            )}
             <TextField
               autoFocus
               margin="dense"
@@ -252,20 +345,31 @@ const Olts: React.FC = () => {
               required
             />
             <TextField
+              select
               margin="dense"
-              name="vendor"
-              label="Vendor"
-              type="text"
+              name="model_id"
+              label="Model"
               fullWidth
-              defaultValue={editingOlt?.vendor || ''}
-            />
+              value={selectedModelId}
+              onChange={(event) => setSelectedModelId(event.target.value)}
+              required
+            >
+              {oltModelsData?.data.map((model: any) => (
+                <MenuItem key={model.id} value={model.id}>
+                  {model.name}
+                </MenuItem>
+              ))}
+            </TextField>
             <TextField
               margin="dense"
-              name="model"
-              label="Model"
+              name="description"
+              label="Description"
               type="text"
               fullWidth
-              defaultValue={editingOlt?.model || ''}
+              multiline
+              rows={3}
+              defaultValue={editingOlt?.description || ''}
+              required
             />
             <TextField
               margin="dense"
@@ -274,6 +378,7 @@ const Olts: React.FC = () => {
               type="text"
               fullWidth
               defaultValue={editingOlt?.software_version || ''}
+              required
             />
             <TextField
               margin="dense"
@@ -282,6 +387,32 @@ const Olts: React.FC = () => {
               type="text"
               fullWidth
               defaultValue={editingOlt?.ip_address_v4 || ''}
+              required
+            />
+            <TextField
+              margin="dense"
+              name="sntp_ip_address"
+              label="SNTP IP Address"
+              type="text"
+              fullWidth
+              defaultValue={editingOlt?.sntp_ip_address || ''}
+              required
+            />
+            <TextField
+              margin="dense"
+              name="syslog_ip_address"
+              label="Syslog IP Address"
+              type="text"
+              fullWidth
+              defaultValue={editingOlt?.syslog_ip_address || ''}
+            />
+            <TextField
+              margin="dense"
+              name="area"
+              label="Area"
+              type="text"
+              fullWidth
+              defaultValue={editingOlt?.area || ''}
               required
             />
             <TextField
@@ -320,7 +451,7 @@ const Olts: React.FC = () => {
                         onMouseDown={(event) => event.preventDefault()}
                         edge="end"
                       >
-                        {showUsername ? <VisibilityOff /> : <Visibility />}
+                        {showUsername ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}
                       </IconButton>
                     </InputAdornment>
                   ),
@@ -343,23 +474,13 @@ const Olts: React.FC = () => {
                         onMouseDown={(event) => event.preventDefault()}
                         edge="end"
                       >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                        {showPassword ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}
                       </IconButton>
                     </InputAdornment>
                   ),
                 }}
               />
             </Box>
-            <TextField
-              margin="dense"
-              name="description"
-              label="Description"
-              type="text"
-              fullWidth
-              multiline
-              rows={3}
-              defaultValue={editingOlt?.description || ''}
-            />
             <TextField
               margin="dense"
               name="logging_type"
@@ -407,7 +528,7 @@ const Olts: React.FC = () => {
           viewingOlt?.pop_name && viewingOlt?.pop_name !== 'N/A'
             ? {
                 pop_name: {
-                  icon: <OpenInNewIcon fontSize="small" />,
+                  icon: <MaterialSymbol name="open_in_new" fontSize="small" />,
                   label: 'Open POP details',
                   onClick: () => {
                     const targetOlt = data?.data.find((olt: any) => olt.id === viewingOlt.id);
@@ -427,21 +548,6 @@ const Olts: React.FC = () => {
         }
       />
 
-      <Snackbar
-        open={Boolean(reachabilityMessage)}
-        autoHideDuration={6000}
-        onClose={() => setReachabilityMessage('')}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert
-          onClose={() => setReachabilityMessage('')}
-          severity={reachabilitySeverity}
-          variant="filled"
-          sx={{ width: '100%' }}
-        >
-          {reachabilityMessage}
-        </Alert>
-      </Snackbar>
     </Layout>
   );
 };

@@ -1,4 +1,5 @@
 import React from 'react';
+import MaterialSymbol from './MaterialSymbol.tsx';
 import {
   Table,
   TableBody,
@@ -11,10 +12,6 @@ import {
   IconButton,
   Tooltip,
 } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
-import DeleteIcon from '@mui/icons-material/Delete';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import BuildIcon from '@mui/icons-material/Build';
 
 interface Column {
   id: string;
@@ -35,6 +32,9 @@ interface DataTableProps {
   onDelete?: (row: any) => void;
   onRowClick?: (row: any) => void;
   onTroubleshoot?: (row: any) => void;
+  onConfigure?: (row: any) => void;
+  onDocument?: (row: any) => void;
+  isConfigureDisabled?: (row: any) => boolean;
 }
 
 const DataTable: React.FC<DataTableProps> = ({
@@ -50,9 +50,14 @@ const DataTable: React.FC<DataTableProps> = ({
   onDelete,
   onRowClick,
   onTroubleshoot,
+  onConfigure,
+  onDocument,
+  isConfigureDisabled,
 }) => {
-  const hasActions = Boolean(onView || onEdit || onDelete || onTroubleshoot);
-  const actionsColumnWidth = hasActions ? 112 : 0;
+  const hasActions = Boolean(onView || onEdit || onDelete || onTroubleshoot || onConfigure || onDocument);
+  const showViewAction = Boolean(onView) && !onRowClick;
+  const actionCount = [showViewAction, onTroubleshoot, onConfigure, onDocument, onEdit, onDelete].filter(Boolean).length;
+  const actionsColumnWidth = hasActions ? Math.max(112, actionCount * 32) : 0;
   const dataColumnWidth = hasActions
     ? `calc((100% - ${actionsColumnWidth}px) / ${columns.length})`
     : `${100 / columns.length}%`;
@@ -146,7 +151,7 @@ const DataTable: React.FC<DataTableProps> = ({
                       width: `${actionsColumnWidth}px`,
                     }}
                   >
-                    {onView && (
+                    {showViewAction && (
                       <Tooltip title="View Details">
                         <IconButton
                           size="small"
@@ -154,7 +159,7 @@ const DataTable: React.FC<DataTableProps> = ({
                           color="info"
                           sx={{ p: 0.5 }}
                         >
-                          <VisibilityIcon />
+                          <MaterialSymbol name="visibility" />
                         </IconButton>
                       </Tooltip>
                     )}
@@ -166,7 +171,34 @@ const DataTable: React.FC<DataTableProps> = ({
                           color="primary"
                           sx={{ p: 0.5 }}
                         >
-                          <BuildIcon />
+                          <MaterialSymbol name="build" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {onConfigure && (
+                      <Tooltip title="Configure">
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() => onConfigure(row)}
+                            color="primary"
+                            sx={{ p: 0.5 }}
+                            disabled={Boolean(isConfigureDisabled?.(row))}
+                          >
+                            <MaterialSymbol name="settings" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    )}
+                    {onDocument && (
+                      <Tooltip title="View Rendered Configuration">
+                        <IconButton
+                          size="small"
+                          onClick={() => onDocument(row)}
+                          color="primary"
+                          sx={{ p: 0.5 }}
+                        >
+                          <MaterialSymbol name="description" />
                         </IconButton>
                       </Tooltip>
                     )}
@@ -178,7 +210,7 @@ const DataTable: React.FC<DataTableProps> = ({
                           color="primary"
                           sx={{ p: 0.5 }}
                         >
-                          <EditIcon />
+                          <MaterialSymbol name="edit" />
                         </IconButton>
                       </Tooltip>
                     )}
@@ -190,7 +222,7 @@ const DataTable: React.FC<DataTableProps> = ({
                           color="error"
                           sx={{ p: 0.5 }}
                         >
-                          <DeleteIcon />
+                          <MaterialSymbol name="delete" />
                         </IconButton>
                       </Tooltip>
                     )}

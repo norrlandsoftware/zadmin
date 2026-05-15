@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import MaterialSymbol from '../components/MaterialSymbol.tsx';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -25,14 +26,6 @@ import {
   Paper,
   Collapse,
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
-import ClearIcon from '@mui/icons-material/Clear';
-import FilterListIcon from '@mui/icons-material/FilterList';
-import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
-import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
@@ -333,7 +326,7 @@ const Onts: React.FC = () => {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon />
+                  <MaterialSymbol name="search" />
                 </InputAdornment>
               ),
               endAdornment: searchSerial && (
@@ -343,7 +336,7 @@ const Onts: React.FC = () => {
                     onClick={() => setSearchSerial('')}
                     edge="end"
                   >
-                    <ClearIcon />
+                    <MaterialSymbol name="close" />
                   </IconButton>
                 </InputAdornment>
               ),
@@ -358,7 +351,7 @@ const Onts: React.FC = () => {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon />
+                  <MaterialSymbol name="search" />
                 </InputAdornment>
               ),
               endAdornment: searchSapId && (
@@ -368,7 +361,7 @@ const Onts: React.FC = () => {
                     onClick={() => setSearchSapId('')}
                     edge="end"
                   >
-                    <ClearIcon />
+                    <MaterialSymbol name="close" />
                   </IconButton>
                 </InputAdornment>
               ),
@@ -377,7 +370,7 @@ const Onts: React.FC = () => {
           <Button
             variant={moreFiltersOpen ? 'contained' : 'outlined'}
             color="primary"
-            startIcon={<FilterListIcon />}
+            startIcon={<MaterialSymbol name="filter_list" />}
             onClick={() => setMoreFiltersOpen((prev) => !prev)}
             sx={{ flexShrink: 0 }}
           >
@@ -386,7 +379,7 @@ const Onts: React.FC = () => {
           <Button
             variant="outlined"
             color="primary"
-            startIcon={<ClearIcon />}
+            startIcon={<MaterialSymbol name="close" />}
             onClick={handleClearFilters}
             sx={{ flexShrink: 0 }}
           >
@@ -509,7 +502,7 @@ const Onts: React.FC = () => {
           viewingOnt?.olt_name && viewingOnt?.olt_name !== 'N/A'
             ? {
                 olt_name: {
-                  icon: <OpenInNewIcon fontSize="small" />,
+                  icon: <MaterialSymbol name="open_in_new" fontSize="small" />,
                   label: 'Open OLT details',
                   onClick: () => {
                     setDetailDialogOpen(false);
@@ -580,7 +573,7 @@ const Onts: React.FC = () => {
                                 size="small"
                                 onClick={() => toggleRow(troubleshoot.id)}
                               >
-                                {isExpanded ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                                {isExpanded ? <MaterialSymbol name="keyboard_arrow_up" /> : <MaterialSymbol name="keyboard_arrow_down" />}
                               </IconButton>
                             </TableCell>
                             <TableCell>{new Date(troubleshoot.created_at).toLocaleString()}</TableCell>
@@ -1062,7 +1055,7 @@ const Onts: React.FC = () => {
                                                           }
                                                         }}
                                                       >
-                                                        <ExpandMoreIcon fontSize="small" />
+                                                        <MaterialSymbol name="expand_more" fontSize="small" />
                                                       </IconButton>
                                                     </>
                                                   ) : (
@@ -1367,7 +1360,7 @@ const Onts: React.FC = () => {
                                                           }
                                                         }}
                                                       >
-                                                        <ExpandMoreIcon fontSize="small" />
+                                                        <MaterialSymbol name="expand_more" fontSize="small" />
                                                       </IconButton>
                                                     </>
                                                   ) : (
@@ -1499,7 +1492,7 @@ const Onts: React.FC = () => {
               }}
               title={copySuccess ? 'Copied!' : 'Copy to clipboard'}
             >
-              <ContentCopyIcon />
+              <MaterialSymbol name="content_copy" />
             </IconButton>
           </Box>
         </DialogTitle>

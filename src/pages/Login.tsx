@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import MaterialSymbol from '../components/MaterialSymbol.tsx';
 import { useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -15,8 +16,6 @@ import {
   Typography,
   Paper,
 } from '@mui/material';
-import Visibility from '@mui/icons-material/Visibility';
-import VisibilityOff from '@mui/icons-material/VisibilityOff';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { auth } from '../services/api.ts';
 
@@ -129,7 +128,7 @@ const Login: React.FC = () => {
                       onMouseDown={(event) => event.preventDefault()}
                       edge="end"
                     >
-                      {showPassword ? <VisibilityOff /> : <Visibility />}
+                      {showPassword ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}
                     </IconButton>
                   </InputAdornment>
                 ),
