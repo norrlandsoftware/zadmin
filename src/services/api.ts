@@ -276,3 +276,27 @@ export const switchModels = createCrudApi('/switch_model');
 export const bngs = createCrudApi('/bng');
 export const switches = createCrudApi('/switch');
 export const oltRenderedConfigurations = createCrudApi('/olt_rendered_config');
+
+
+export const workflows = {
+  startOltInitialization: async (oltId: string) => {
+    const response = await api.post(`/olt/${oltId}/workflow/initialization/start`);
+    return response.data;
+  },
+  getInstance: async (instanceId: string) => {
+    const response = await api.get(`/workflow_instance/${instanceId}`);
+    return response.data;
+  },
+  stopInstance: async (instanceId: string, reason?: string) => {
+    const response = await api.post(`/workflow_instance/${instanceId}/stop`, { reason });
+    return response.data;
+  },
+  completeManualAction: async (instanceId: string, actionCode: string, success: boolean, note?: string) => {
+    const response = await api.post(`/workflow_instance/${instanceId}/action/${actionCode}/manual`, { success, note });
+    return response.data;
+  },
+  retryAutomaticAction: async (instanceId: string, actionCode: string) => {
+    const response = await api.post(`/workflow_instance/${instanceId}/action/${actionCode}/retry`);
+    return response.data;
+  },
+};

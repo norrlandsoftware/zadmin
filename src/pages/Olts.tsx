@@ -21,7 +21,7 @@ import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
 import { useResultBar } from '../contexts/ResultBarContext.tsx';
-import { olts, oltModels, pops } from '../services/api.ts';
+import { olts, oltModels, pops, workflows } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
 const formatOptional = (value: string | null | undefined) =>
@@ -55,6 +55,7 @@ const Olts: React.FC = () => {
   const [formError, setFormError] = useState<string | null>(null);
   const [selectedModelId, setSelectedModelId] = useState('');
   const [isNavigatingToSettings, setIsNavigatingToSettings] = useState(false);
+  const [startingWorkflowId, setStartingWorkflowId] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -186,6 +187,20 @@ const Olts: React.FC = () => {
   const handleViewRenderedConfigurations = (olt: any) => {
     navigate(`/olts/${olt.id}/rendered-configurations`);
   };
+
+  const handleStartInitializationWorkflow = async (olt: any) => {
+    try {
+      setStartingWorkflowId(olt.id);
+      const instance = await workflows.startOltInitialization(olt.id);
+      navigate(`/olts/${olt.id}/workflow/${instance.id}`);
+    } catch (error) {
+      console.error('Error starting OLT initialization workflow:', error);
+      pushResult('error', `Unable to start initialization workflow for ${olt.name || 'selected OLT'}`);
+    } finally {
+      setStartingWorkflowId(null);
+    }
+  };
+
 
   const handleClose = () => {
     setDialogOpen(false);
@@ -516,13 +531,22 @@ const Olts: React.FC = () => {
         title="OLT Details"
         data={viewingOlt}
         actions={
-          <Button
-            onClick={handleTestReachability}
-            disabled={testingOlt || !viewingOlt?.id}
-            variant="outlined"
-          >
-            {testingOlt ? 'Testing...' : 'Test'}
-          </Button>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              onClick={handleTestReachability}
+              disabled={testingOlt || !viewingOlt?.id}
+              variant="outlined"
+            >
+              {testingOlt ? 'Testing...' : 'Test'}
+            </Button>
+            <Button
+              onClick={() => viewingOlt && handleStartInitializationWorkflow(viewingOlt)}
+              disabled={!viewingOlt?.id || startingWorkflowId === viewingOlt?.id}
+              variant="contained"
+            >
+              {startingWorkflowId === viewingOlt?.id ? 'Starting...' : 'Start Initialization'}
+            </Button>
+          </Box>
         }
         fieldActions={
           viewingOlt?.pop_name && viewingOlt?.pop_name !== 'N/A'

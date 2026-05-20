@@ -15,6 +15,7 @@ import Olts from './pages/Olts.tsx';
 import OltSettings from './pages/OltConfiguration.tsx';
 import OltRenderedConfigurations from './pages/OltRenderedConfigurations.tsx';
 import OltRenderedConfigurationDetails from './pages/OltRenderedConfigurationDetails.tsx';
+import OltInitializationWorkflow from './pages/OltInitializationWorkflow.tsx';
 import Onts from './pages/Onts.tsx';
 import Switches from './pages/Switches.tsx';
 import Users from './pages/Users.tsx';
@@ -96,6 +97,16 @@ const App: React.FC = () => {
                   </PrivateRoute>
                 }
               />
+
+              <Route
+                path="/olts/:id/workflow/:instanceId"
+                element={
+                  <PrivateRoute>
+                    <OltInitializationWorkflow />
+                  </PrivateRoute>
+                }
+              />
+
               <Route
                 path="/olts/:id/rendered-configurations/:renderedId"
                 element={

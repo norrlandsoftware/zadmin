@@ -43,4 +43,15 @@ npm test
 - Axios instance configured in `src/services/api.ts`
 - Bearer token authentication via localStorage
 - Request interceptor adds auth token to all requests
-- API organized by resource (pops, olts, onts, users, auth)
+- API organized by resource or domain action (pops, olts, onts, users, auth, workflows)
+- Use TanStack Query for reads and polling server state
+- Use mutations for commands such as creating, updating, starting workflows, stopping workflows, completing manual tasks, and retrying failed automatic tasks
+- For operational workflows, frontend behavior must be driven by API response fields such as status, current task, task attempts, errors, progress, and action metadata
+- Keep workflow sequencing and validation in the backend; the UI should hide unavailable actions but never be the authority for what is executable
+
+## UI Conventions
+
+- Prefer existing MUI components and local shared components before adding new UI patterns
+- Use `Layout` for page shells, `DataTable` for tabular resource lists, and `DetailDialog` for record details
+- Use `ResultBarContext` for user-facing operation feedback
+- Keep operational screens dense, readable, and suitable for repeated operator use
