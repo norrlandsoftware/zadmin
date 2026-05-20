@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Alert,
@@ -11,6 +11,41 @@ import {
 } from '@mui/material';
 import { users } from '../services/api.ts';
 
+const passwordRuleLabels = [
+  'At least 8 characters',
+  'At least one uppercase letter',
+  'At least one lowercase letter',
+  'At least one digit',
+  'At least one symbol: !@#$%^&*()-_=+[]{}|;:,.<>?/',
+];
+
+const passwordSymbols = '!@#$%^&*()-_=+[]{}|;:,.<>?/';
+
+const getPasswordRuleResults = (value: string) => [
+  value.length > 7,
+  /[A-Z]/.test(value),
+  /[a-z]/.test(value),
+  /\d/.test(value),
+  Array.from(value).some((character) => passwordSymbols.includes(character)),
+];
+
+const getErrorMessage = (err: any) => {
+  const data = err?.response?.data;
+  if (typeof data === 'string') {
+    return data;
+  }
+  if (data?.context?.message) {
+    return data.context.message;
+  }
+  if (data?.detail?.context?.message) {
+    return data.detail.context.message;
+  }
+  if (Array.isArray(data?.detail)) {
+    return data.detail.map((item: any) => item?.msg || String(item)).join('\n');
+  }
+  return data?.detail || data?.message || 'Unable to update the password.';
+};
+
 const ResetPassword: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -22,6 +57,18 @@ const ResetPassword: React.FC = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const passwordRuleResults = useMemo(() => getPasswordRuleResults(password), [password]);
+  const isPasswordValid = passwordRuleResults.every(Boolean);
+  const passwordsMatch = password === confirmPassword;
+  const shouldShowPasswordRules = password.length > 0;
+  const shouldShowConfirmError = confirmPassword.length > 0 && !passwordsMatch;
+  const canSubmit =
+    Boolean(userId && resetPasswordToken) &&
+    isPasswordValid &&
+    passwordsMatch &&
+    confirmPassword.length > 0 &&
+    !isSubmitting;
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -38,7 +85,12 @@ const ResetPassword: React.FC = () => {
       return;
     }
 
-    if (password !== confirmPassword) {
+    if (!isPasswordValid) {
+      setError('The password does not respect all the password rules.');
+      return;
+    }
+
+    if (!passwordsMatch) {
       setError('Passwords do not match.');
       return;
     }
@@ -54,11 +106,7 @@ const ResetPassword: React.FC = () => {
       setPassword('');
       setConfirmPassword('');
     } catch (err: any) {
-      setError(
-        err?.response?.data?.detail?.[0]?.msg ||
-          err?.response?.data?.message ||
-          'Unable to update the password.'
-      );
+      setError(getErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -113,8 +161,33 @@ const ResetPassword: React.FC = () => {
                 autoComplete="new-password"
                 autoFocus
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                error={shouldShowPasswordRules && !isPasswordValid}
+                helperText=" "
+                onChange={(event) => {
+                  setPassword(event.target.value);
+                  setError('');
+                }}
               />
+              {shouldShowPasswordRules && (
+                <Box sx={{ mt: -1, ml: 1.75 }}>
+                  {passwordRuleLabels.map((label, index) => {
+                    const isOk = passwordRuleResults[index];
+                    return (
+                      <Typography
+                        key={label}
+                        variant="caption"
+                        component="div"
+                        sx={{
+                          color: isOk ? 'success.main' : 'error.main',
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        - {label}
+                      </Typography>
+                    );
+                  })}
+                </Box>
+              )}
               <TextField
                 margin="normal"
                 required
@@ -124,7 +197,12 @@ const ResetPassword: React.FC = () => {
                 type="password"
                 autoComplete="new-password"
                 value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
+                error={shouldShowConfirmError}
+                helperText={shouldShowConfirmError ? 'Passwords do not match.' : ' '}
+                onChange={(event) => {
+                  setConfirmPassword(event.target.value);
+                  setError('');
+                }}
               />
               {error && (
                 <Alert severity="error" sx={{ mt: 2 }}>
@@ -135,7 +213,7 @@ const ResetPassword: React.FC = () => {
                 type="submit"
                 fullWidth
                 variant="contained"
-                disabled={isSubmitting}
+                disabled={!canSubmit}
                 sx={{ mt: 3, mb: 2 }}
               >
                 {isSubmitting ? 'Updating...' : 'Update Password'}
