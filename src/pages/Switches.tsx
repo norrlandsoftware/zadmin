@@ -189,11 +189,15 @@ const Switches: React.FC = () => {
       />
 
       <Dialog open={dialogOpen} onClose={handleClose} maxWidth="sm" fullWidth>
-        <form onSubmit={handleSave}>
+        <form onSubmit={handleSave} autoComplete="off">
           <DialogTitle>
             {editingSwitch ? 'Edit Switch' : 'Create New Switch'}
           </DialogTitle>
           <DialogContent>
+            <Box sx={{ display: 'none' }} aria-hidden="true">
+              <input type="text" name="fake_username" autoComplete="username" tabIndex={-1} />
+              <input type="password" name="fake_password" autoComplete="current-password" tabIndex={-1} />
+            </Box>
             {formError && (
               <Alert severity="error" sx={{ mb: 2, mt: 1 }}>
                 {formError}
@@ -273,6 +277,12 @@ const Switches: React.FC = () => {
                 type={showUsername ? 'text' : 'password'}
                 fullWidth
                 defaultValue={editingSwitch?.username || ''}
+                autoComplete="off"
+                inputProps={{
+                  autoComplete: 'off',
+                  'data-lpignore': 'true',
+                  'data-form-type': 'other',
+                }}
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
@@ -295,6 +305,12 @@ const Switches: React.FC = () => {
                 type={showPassword ? 'text' : 'password'}
                 fullWidth
                 defaultValue={editingSwitch?.password || ''}
+                autoComplete="new-password"
+                inputProps={{
+                  autoComplete: 'new-password',
+                  'data-lpignore': 'true',
+                  'data-form-type': 'other',
+                }}
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
