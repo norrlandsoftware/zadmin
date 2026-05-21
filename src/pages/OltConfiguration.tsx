@@ -51,6 +51,23 @@ const compactFieldSx = {
   },
 };
 
+const getApiErrorMessage = (error: any, fallback: string) => {
+  const data = error?.response?.data;
+  if (typeof data === 'string') {
+    return data;
+  }
+  if (data?.context?.message) {
+    return data.context.message;
+  }
+  if (data?.detail?.context?.message) {
+    return data.detail.context.message;
+  }
+  if (Array.isArray(data?.detail)) {
+    return data.detail.map((item: any) => item?.msg || String(item)).join('\n');
+  }
+  return data?.detail || data?.message || fallback;
+};
+
 interface PonSlotConfig {
   slotNumber: number;
   lineCardModelId: string;
@@ -94,7 +111,14 @@ const OltSettings: React.FC = () => {
   } = useQuery(
     ['olt-settings-existing', id],
     () => oltSettings.getByOltId(id),
-    { enabled: Boolean(id), retry: false }
+    {
+      enabled: Boolean(id),
+      retry: false,
+      refetchOnMount: 'always',
+      refetchOnReconnect: false,
+      refetchOnWindowFocus: false,
+      staleTime: 0,
+    }
   );
 
   const isSettingsResolved =
@@ -130,78 +154,6 @@ const OltSettings: React.FC = () => {
     [settingsElements]
   );
 
-  const referencedLineCardModelCodes = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          ((existingSettings?.elements?.linecards as any[]) || []).concat((existingSettings?.elements?.pon as any[]) || [])
-            .map((item: any) => item.olt_line_card_model_code)
-            .filter(Boolean)
-        )
-      ),
-    [existingSettings]
-  );
-
-  const referencedLegacyLineCardModelIds = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          ((existingSettings?.elements?.linecards as any[]) || []).concat((existingSettings?.elements?.pon as any[]) || [])
-            .map((item: any) => item.olt_line_card_model_id)
-            .filter(Boolean)
-        )
-      ),
-    [existingSettings]
-  );
-
-  const referencedUplinkCardModelCodes = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          ((existingSettings?.elements?.uplinks as any[]) || []).concat((existingSettings?.elements?.uplink as any[]) || [])
-            .map((item: any) => item.olt_uplink_card_model_code)
-            .filter(Boolean)
-        )
-      ),
-    [existingSettings]
-  );
-
-  const referencedLegacyUplinkCardModelIds = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          ((existingSettings?.elements?.uplinks as any[]) || []).concat((existingSettings?.elements?.uplink as any[]) || [])
-            .map((item: any) => item.olt_uplink_card_model_id)
-            .filter(Boolean)
-        )
-      ),
-    [existingSettings]
-  );
-
-  const referencedSwitchIds = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          ((existingSettings?.elements?.uplinks as any[]) || []).concat((existingSettings?.elements?.uplink as any[]) || [])
-            .map((item: any) => item?.configuration?.uplink_device_id)
-            .filter(Boolean)
-        )
-      ),
-    [existingSettings]
-  );
-
-  const referencedBngIds = useMemo(
-    () =>
-      Array.from(
-        new Set(
-          ((existingSettings?.elements?.bng as any[]) || [])
-            .map((item: any) => item.bng_id)
-            .filter(Boolean)
-        )
-      ),
-    [existingSettings]
-  );
-
   const settingsBngIds = useMemo(
     () =>
       Array.from(
@@ -215,89 +167,25 @@ const OltSettings: React.FC = () => {
   );
 
   const { data: lineCardModelsData, isLoading: isLineCardModelsLoading } = useQuery(
-    [
-      'olt-line-card-models-settings',
-      referencedLineCardModelCodes.join(','),
-      referencedLegacyLineCardModelIds.join(','),
-    ],
-    async () => {
-      if (referencedLineCardModelCodes.length === 0 && referencedLegacyLineCardModelIds.length === 0) {
-        return oltLineCardModels.getAll({ size: 1000, sort: 'name' });
-      }
-
-      const byCodeResults = await Promise.all(
-        referencedLineCardModelCodes.map((code) =>
-          oltLineCardModels.getAll({ q: `code:${code}`, size: 1 })
-        )
-      );
-      const byIdResults = await Promise.all(
-        referencedLegacyLineCardModelIds.map((modelId) => oltLineCardModels.getById(modelId))
-      );
-
-      const merged = [
-        ...byCodeResults.flatMap((result: any) => result?.data || []),
-        ...byIdResults.filter(Boolean),
-      ];
-      const unique = Array.from(new Map(merged.map((item: any) => [item.id, item])).values());
-
-      return { data: unique };
-    },
+    ['olt-line-card-models-settings'],
+    () => oltLineCardModels.getAll({ size: 1000, sort: 'name' }),
     { enabled: canLoadReferencedResources }
   );
 
   const { data: uplinkCardModelsData, isLoading: isUplinkCardModelsLoading } = useQuery(
-    [
-      'olt-uplink-card-models-settings',
-      referencedUplinkCardModelCodes.join(','),
-      referencedLegacyUplinkCardModelIds.join(','),
-    ],
-    async () => {
-      if (referencedUplinkCardModelCodes.length === 0 && referencedLegacyUplinkCardModelIds.length === 0) {
-        return oltUplinkCardModels.getAll({ size: 1000, sort: 'name' });
-      }
-
-      const byCodeResults = await Promise.all(
-        referencedUplinkCardModelCodes.map((code) =>
-          oltUplinkCardModels.getAll({ q: `code:${code}`, size: 1 })
-        )
-      );
-      const byIdResults = await Promise.all(
-        referencedLegacyUplinkCardModelIds.map((modelId) => oltUplinkCardModels.getById(modelId))
-      );
-
-      const merged = [
-        ...byCodeResults.flatMap((result: any) => result?.data || []),
-        ...byIdResults.filter(Boolean),
-      ];
-      const unique = Array.from(new Map(merged.map((item: any) => [item.id, item])).values());
-
-      return { data: unique };
-    },
+    ['olt-uplink-card-models-settings'],
+    () => oltUplinkCardModels.getAll({ size: 1000, sort: 'name' }),
     { enabled: canLoadReferencedResources }
   );
 
   const { data: switchesData, isLoading: isSwitchesLoading } = useQuery(
-    ['switches-settings', referencedSwitchIds.join(',')],
-    async () => {
-      if (referencedSwitchIds.length === 0) {
-        return switches.getAll({ size: 1000, sort: 'name' });
-      }
-
-      const items = await Promise.all(referencedSwitchIds.map((switchId) => switches.getById(switchId)));
-      return { data: items.filter(Boolean) };
-    },
+    ['switches-settings'],
+    () => switches.getAll({ size: 1000, sort: 'name', q: 'type:DISTRIBUTION' }),
     { enabled: canLoadReferencedResources }
   );
   const { data: bngsData, isLoading: isBngsLoading } = useQuery(
-    ['bngs-settings', referencedBngIds.join(',')],
-    async () => {
-      if (referencedBngIds.length === 0) {
-        return bngs.getAll({ size: 1000, sort: 'name' });
-      }
-
-      const items = await Promise.all(referencedBngIds.map((bngId) => bngs.getById(bngId)));
-      return { data: items.filter(Boolean) };
-    },
+    ['bngs-settings'],
+    () => bngs.getAll({ size: 1000, sort: 'name' }),
     { enabled: canLoadReferencedResources }
   );
   const { data: bngModelsData, isLoading: isBngModelsLoading } = useQuery(
@@ -322,6 +210,23 @@ const OltSettings: React.FC = () => {
       ),
     [lineCardModelsData]
   );
+  const currentOltModelCode = oltModel?.code || '';
+  const currentOltModelId = olt?.model_id != null ? String(olt.model_id) : '';
+  const compatibleLineCardModels = useMemo(
+    () =>
+      (lineCardModelsData?.data || []).filter((model: any) => {
+        const supportedCodes = Array.isArray(model?.olt_model_codes) ? model.olt_model_codes : [];
+        const supportedIds = Array.isArray(model?.olt_model_ids) ? model.olt_model_ids.map(String) : [];
+        if (supportedCodes.length === 0 && supportedIds.length === 0) {
+          return true;
+        }
+        return (
+          (currentOltModelCode !== '' && supportedCodes.includes(currentOltModelCode)) ||
+          (currentOltModelId !== '' && supportedIds.includes(currentOltModelId))
+        );
+      }),
+    [currentOltModelCode, currentOltModelId, lineCardModelsData]
+  );
 
   const uplinkCardModelByCode = useMemo(
     () =>
@@ -331,6 +236,21 @@ const OltSettings: React.FC = () => {
           .map((model: any) => [model.code, model])
       ),
     [uplinkCardModelsData]
+  );
+  const compatibleUplinkCardModels = useMemo(
+    () =>
+      (uplinkCardModelsData?.data || []).filter((model: any) => {
+        const supportedCodes = Array.isArray(model?.olt_model_codes) ? model.olt_model_codes : [];
+        const supportedIds = Array.isArray(model?.olt_model_ids) ? model.olt_model_ids.map(String) : [];
+        if (supportedCodes.length === 0 && supportedIds.length === 0) {
+          return true;
+        }
+        return (
+          (currentOltModelCode !== '' && supportedCodes.includes(currentOltModelCode)) ||
+          (currentOltModelId !== '' && supportedIds.includes(currentOltModelId))
+        );
+      }),
+    [currentOltModelCode, currentOltModelId, uplinkCardModelsData]
   );
 
   const switchById = useMemo(
@@ -475,7 +395,11 @@ const OltSettings: React.FC = () => {
           uplinkCardModelId: slot.uplinkCardModelId || resolvedModelId || '',
           switchId: slot.switchId || configuredSwitchId || configuredSwitch?.id || '',
           switchPort: slot.switchPort || source.configuration?.switch_port || '',
-          switchIpAddress: slot.switchIpAddress || source.configuration?.ip_address || '',
+          switchIpAddress:
+            slot.switchIpAddress ||
+            configuredSwitch?.ip_address_v4 ||
+            source.configuration?.ip_address ||
+            '',
           oltPort: slot.oltPort || source.configuration?.olt_port || '',
         };
       })
@@ -724,17 +648,9 @@ const OltSettings: React.FC = () => {
       await olts.renderConfig(id);
       pushResult('success', 'Configuration generated.');
     } catch (error: any) {
-      const responseData = error?.response?.data;
-      const contextMessage =
-        responseData?.context?.message ||
-        responseData?.detail?.context?.message ||
-        null;
       pushResult(
         'error',
-        contextMessage ||
-          error?.response?.data?.detail?.[0]?.msg ||
-          error?.response?.data?.message ||
-          'Unable to generate configuration.'
+        getApiErrorMessage(error, 'Unable to generate configuration.')
       );
     } finally {
       setIsGeneratingConfig(false);
@@ -854,10 +770,6 @@ const OltSettings: React.FC = () => {
     settingsLinecards,
     settingsUplinks,
     ponSlots.length,
-    referencedBngIds.length,
-    referencedLineCardModelCodes.length,
-    referencedSwitchIds.length,
-    referencedUplinkCardModelCodes.length,
     switchById,
     switchByName,
     switchesData,
@@ -884,9 +796,7 @@ const OltSettings: React.FC = () => {
     } catch (error: any) {
       pushResult(
         'error',
-        error?.response?.data?.detail?.[0]?.msg ||
-          error?.response?.data?.message ||
-          'Unable to save OLT settings.'
+        getApiErrorMessage(error, 'Unable to save OLT settings.')
       );
     } finally {
       setIsSaving(false);
@@ -946,11 +856,11 @@ const OltSettings: React.FC = () => {
         </Button>
       </Box>
 
-      <Box sx={{ display: 'grid', gap: 3 }}>
-        <Paper sx={{ p: 2 }}>
-          <Box sx={{ mb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+      <Box sx={{ display: 'grid', gap: 2 }}>
+        <Paper sx={{ px: 2, pt: 1, pb: 2 }}>
+          <Box sx={{ mb: 0.75, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-              PON
+              PON Line Cards
             </Typography>
             {ponSlots.length > 1 && (
               <FormControlLabel
@@ -1043,7 +953,7 @@ const OltSettings: React.FC = () => {
                   }
                 >
                   <MenuItem value="">N/A</MenuItem>
-                  {(lineCardModelsData?.data || []).map((model: any) => (
+                  {compatibleLineCardModels.map((model: any) => (
                     <MenuItem key={model.id} value={model.id}>
                       {model.name}
                     </MenuItem>
@@ -1078,8 +988,8 @@ const OltSettings: React.FC = () => {
           })}
         </Paper>
 
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 700 }}>
+        <Paper sx={{ px: 2, pt: 1, pb: 2 }}>
+          <Typography variant="subtitle1" sx={{ mb: 0.75, fontWeight: 700 }}>
             Uplink
           </Typography>
           {uplinkSlots.length === 0 && (
@@ -1149,7 +1059,7 @@ const OltSettings: React.FC = () => {
                 }
               >
                 <MenuItem value="">N/A</MenuItem>
-                {(uplinkCardModelsData?.data || []).map((model: any) => (
+                {compatibleUplinkCardModels.map((model: any) => (
                   <MenuItem key={model.id} value={model.id}>
                     {model.name}
                   </MenuItem>
@@ -1161,9 +1071,14 @@ const OltSettings: React.FC = () => {
                 size="small"
                 sx={compactFieldSx}
                 value={slot.switchId}
-                onChange={(event) =>
-                  updateUplinkSlot(slot.slotNumber, { switchId: event.target.value })
-                }
+                onChange={(event) => {
+                  const selectedSwitchId = event.target.value;
+                  const selectedSwitch = switchById.get(selectedSwitchId);
+                  updateUplinkSlot(slot.slotNumber, {
+                    switchId: selectedSwitchId,
+                    switchIpAddress: selectedSwitch?.ip_address_v4 || '',
+                  });
+                }}
               >
                 <MenuItem value="">N/A</MenuItem>
                 {switchesData?.data.map((item: any) => (
@@ -1186,11 +1101,9 @@ const OltSettings: React.FC = () => {
                 size="small"
                 sx={compactFieldSx}
                 value={slot.switchIpAddress}
-                onChange={(event) =>
-                  updateUplinkSlot(slot.slotNumber, {
-                    switchIpAddress: event.target.value,
-                  })
-                }
+                InputProps={{
+                  readOnly: true,
+                }}
               />
               <TextField
                 fullWidth
@@ -1205,8 +1118,8 @@ const OltSettings: React.FC = () => {
           ))}
         </Paper>
 
-        <Paper sx={{ p: 2 }}>
-          <Typography variant="subtitle1" sx={{ mb: 1, fontWeight: 700 }}>
+        <Paper sx={{ px: 2, pt: 1, pb: 2 }}>
+          <Typography variant="subtitle1" sx={{ mb: 0.75, fontWeight: 700 }}>
             BNG
           </Typography>
           <Box
