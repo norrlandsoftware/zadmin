@@ -29,6 +29,7 @@ import {
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import { FormDialogGrid, FormDialogItem, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import { onts, olts } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
@@ -427,64 +428,21 @@ const Onts: React.FC = () => {
         onEdit={handleEdit}
       />
 
-      <Dialog open={dialogOpen} onClose={handleClose}>
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
         <form onSubmit={handleSave}>
-          <DialogTitle>
+          <DialogTitle sx={formDialogTitleSx}>
             {editingOnt ? 'Edit ONT' : 'Create New ONT'}
           </DialogTitle>
-          <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              name="serial_number"
-              label="Serial Number"
-              type="text"
-              fullWidth
-              defaultValue={editingOnt?.serial_number || ''}
-              required
-            />
-            <TextField
-              margin="dense"
-              name="vendor"
-              label="Vendor"
-              type="text"
-              fullWidth
-              defaultValue={editingOnt?.vendor || ''}
-            />
-            <TextField
-              margin="dense"
-              name="model"
-              label="Model"
-              type="text"
-              fullWidth
-              defaultValue={editingOnt?.model || ''}
-            />
-            <TextField
-              select
-              margin="dense"
-              name="olt_id"
-              label="OLT"
-              fullWidth
-              defaultValue={editingOnt?.olt_id || ''}
-              required
-            >
-              {oltsData?.data.map((olt: any) => (
-                <MenuItem key={olt.id} value={olt.id}>
-                  {olt.name}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              margin="dense"
-              name="port"
-              label="Port"
-              type="text"
-              fullWidth
-              defaultValue={editingOnt?.port || ''}
-              required
-            />
+          <DialogContent sx={formDialogContentSx}>
+            <FormDialogGrid>
+              <FormDialogItem><TextField autoFocus name="serial_number" label="Serial Number" type="text" fullWidth defaultValue={editingOnt?.serial_number || ''} required /></FormDialogItem>
+              <FormDialogItem><TextField name="vendor" label="Vendor" type="text" fullWidth defaultValue={editingOnt?.vendor || ''} /></FormDialogItem>
+              <FormDialogItem><TextField name="model" label="Model" type="text" fullWidth defaultValue={editingOnt?.model || ''} /></FormDialogItem>
+              <FormDialogItem><TextField select name="olt_id" label="OLT" fullWidth defaultValue={editingOnt?.olt_id || ''} required>{oltsData?.data.map((olt: any) => <MenuItem key={olt.id} value={olt.id}>{olt.name}</MenuItem>)}</TextField></FormDialogItem>
+              <FormDialogItem><TextField name="port" label="Port" type="text" fullWidth defaultValue={editingOnt?.port || ''} required /></FormDialogItem>
+            </FormDialogGrid>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={formDialogActionsSx}>
             <Button onClick={handleClose}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary">
               Save

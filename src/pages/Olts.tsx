@@ -16,10 +16,18 @@ import {
   IconButton,
   Typography,
   Alert,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper,
 } from '@mui/material';
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import { FormDialogGrid, FormDialogItem, FormDialogSectionTitle, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import { useResultBar } from '../contexts/ResultBarContext.tsx';
 import { olts, oltModels, pops, workflows } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
@@ -40,6 +48,22 @@ const getErrorMessage = (error: any) =>
   error?.response?.data?.message ||
   'Unable to save OLT.';
 
+const getWorkflowInstances = (workflowInstancesResponse: any) => {
+  if (!workflowInstancesResponse) {
+    return [];
+  }
+
+  if (Array.isArray(workflowInstancesResponse)) {
+    return workflowInstancesResponse;
+  }
+
+  if (Array.isArray(workflowInstancesResponse.data)) {
+    return workflowInstancesResponse.data;
+  }
+
+  return [];
+};
+
 const Olts: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -56,6 +80,7 @@ const Olts: React.FC = () => {
   const [selectedModelId, setSelectedModelId] = useState('');
   const [isNavigatingToSettings, setIsNavigatingToSettings] = useState(false);
   const [startingWorkflowId, setStartingWorkflowId] = useState<string | null>(null);
+  const [viewingOltId, setViewingOltId] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -99,6 +124,22 @@ const Olts: React.FC = () => {
     enabled: !isNavigatingToSettings,
     refetchOnWindowFocus: false,
   });
+  const { data: viewingOltDetails, isLoading: isLoadingOltDetails } = useQuery(
+    ['olt-details', viewingOltId],
+    () => olts.getById(viewingOltId as string),
+    {
+      enabled: detailDialogOpen && Boolean(viewingOltId),
+      refetchOnWindowFocus: false,
+    }
+  );
+  const { data: viewingWorkflowInstances, isLoading: isLoadingWorkflowInstances } = useQuery(
+    ['olt-workflow-instances', viewingOltId],
+    () => workflows.getOltInstances(viewingOltId as string),
+    {
+      enabled: detailDialogOpen && Boolean(viewingOltId),
+      refetchOnWindowFocus: false,
+    }
+  );
 
   const popNameById = useMemo(
     () => new Map((popsData?.data || []).map((pop: any) => [pop.id, pop.name])),
@@ -152,6 +193,7 @@ const Olts: React.FC = () => {
     delete oltWithNames.model_id;
     delete oltWithNames.pop_id;
 
+    setViewingOltId(matchedOlt.id);
     setViewingOlt(oltWithNames);
     setDetailDialogOpen(true);
     navigate(location.pathname, { replace: true, state: {} });
@@ -163,6 +205,7 @@ const Olts: React.FC = () => {
     delete oltWithNames.model_id;
     delete oltWithNames.pop_id;
 
+    setViewingOltId(olt.id);
     setViewingOlt(oltWithNames);
     setDetailDialogOpen(true);
   };
@@ -193,9 +236,21 @@ const Olts: React.FC = () => {
       setStartingWorkflowId(olt.id);
       const instance = await workflows.startOltInitialization(olt.id);
       navigate(`/olts/${olt.id}/workflow/${instance.id}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting OLT initialization workflow:', error);
-      pushResult('error', `Unable to start initialization workflow for ${olt.name || 'selected OLT'}`);
+      const apiMessage =
+        error?.response?.data?.context?.message ||
+        error?.response?.data?.detail?.context?.message ||
+        error?.response?.data?.detail?.[0]?.msg ||
+        error?.response?.data?.detail ||
+        error?.response?.data?.message ||
+        (typeof error?.response?.data === 'string' ? error.response.data : null);
+      pushResult(
+        'error',
+        apiMessage
+          ? `Unable to start initialization workflow for ${olt.name || 'selected OLT'}: ${apiMessage}`
+          : `Unable to start initialization workflow for ${olt.name || 'selected OLT'}`
+      );
     } finally {
       setStartingWorkflowId(null);
     }
@@ -210,6 +265,35 @@ const Olts: React.FC = () => {
     setShowUsername(false);
     setShowPassword(false);
   };
+
+  const handleCloseDetailDialog = () => {
+    setDetailDialogOpen(false);
+    setViewingOltId(null);
+  };
+
+  const detailedViewingOlt = useMemo(() => {
+    if (!viewingOlt) {
+      return null;
+    }
+
+    if (!viewingOltDetails) {
+      return viewingOlt;
+    }
+
+    const merged = decorateOlt(viewingOltDetails);
+    delete merged.model_id;
+    delete merged.pop_id;
+    return merged;
+  }, [decorateOlt, viewingOlt, viewingOltDetails]);
+
+  const initializationProcesses = useMemo(
+    () =>
+      getWorkflowInstances(viewingWorkflowInstances).filter((process: any) => {
+        const workflowType = String(process?.workflow_type || process?.type || '').toLowerCase();
+        return !workflowType || workflowType.includes('initialization');
+      }),
+    [viewingWorkflowInstances]
+  );
 
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -269,6 +353,15 @@ const Olts: React.FC = () => {
     } finally {
       setTestingOlt(false);
     }
+  };
+
+  const handleOpenWorkflowInstance = (workflowInstance: any) => {
+    if (!viewingOltId || !workflowInstance?.id) {
+      return;
+    }
+
+    handleCloseDetailDialog();
+    navigate(`/olts/${viewingOltId}/workflow/${workflowInstance.id}`);
   };
 
   if (isLoading && !data) {
@@ -338,12 +431,12 @@ const Olts: React.FC = () => {
         onEdit={handleEdit}
       />
 
-      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth>
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
         <form onSubmit={handleSave} autoComplete="off">
-          <DialogTitle>
+          <DialogTitle sx={formDialogTitleSx}>
             {editingOlt ? 'Edit OLT' : 'Create New OLT'}
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={formDialogContentSx}>
             <Box sx={{ display: 'none' }} aria-hidden="true">
               <input type="text" name="fake_username" autoComplete="username" tabIndex={-1} />
               <input type="password" name="fake_password" autoComplete="current-password" tabIndex={-1} />
@@ -353,186 +446,123 @@ const Olts: React.FC = () => {
                 {formError}
               </Alert>
             )}
-            <TextField
-              autoFocus
-              margin="dense"
-              name="name"
-              label="Name"
-              type="text"
-              fullWidth
-              defaultValue={editingOlt?.name || ''}
-              required
-            />
-            <TextField
-              select
-              margin="dense"
-              name="model_id"
-              label="Model"
-              fullWidth
-              value={selectedModelId}
-              onChange={(event) => setSelectedModelId(event.target.value)}
-              required
-            >
-              {oltModelsData?.data.map((model: any) => (
-                <MenuItem key={model.id} value={model.id}>
-                  {model.name}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              margin="dense"
-              name="description"
-              label="Description"
-              type="text"
-              fullWidth
-              multiline
-              rows={3}
-              defaultValue={editingOlt?.description || ''}
-              required
-            />
-            <TextField
-              margin="dense"
-              name="software_version"
-              label="Software Version"
-              type="text"
-              fullWidth
-              defaultValue={editingOlt?.software_version || ''}
-              required
-            />
-            <TextField
-              margin="dense"
-              name="ip_address_v4"
-              label="IP Address"
-              type="text"
-              fullWidth
-              defaultValue={editingOlt?.ip_address_v4 || ''}
-              required
-            />
-            <TextField
-              margin="dense"
-              name="sntp_ip_address"
-              label="SNTP IP Address"
-              type="text"
-              fullWidth
-              defaultValue={editingOlt?.sntp_ip_address || ''}
-              required
-            />
-            <TextField
-              margin="dense"
-              name="syslog_ip_address"
-              label="Syslog IP Address"
-              type="text"
-              fullWidth
-              defaultValue={editingOlt?.syslog_ip_address || ''}
-            />
-            <TextField
-              margin="dense"
-              name="area"
-              label="Area"
-              type="text"
-              fullWidth
-              defaultValue={editingOlt?.area || ''}
-              required
-            />
-            <TextField
-              select
-              margin="dense"
-              name="pop_id"
-              label="POP"
-              fullWidth
-              defaultValue={editingOlt?.pop_id || ''}
-              required
-            >
-              {popsData?.data.map((pop: any) => (
-                <MenuItem key={pop.id} value={pop.id}>
-                  {pop.name}
-                </MenuItem>
-              ))}
-            </TextField>
-            <Box sx={{ mt: 2, mb: 1 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Credentials
-              </Typography>
-              <TextField
-                margin="dense"
-                name="username"
-                label="Username"
-                type={showUsername ? 'text' : 'password'}
-                fullWidth
-                defaultValue={editingOlt?.username || ''}
-                required
-                autoComplete="off"
-                inputProps={{
-                  autoComplete: 'off',
-                  'data-lpignore': 'true',
-                  'data-form-type': 'other',
-                }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label={showUsername ? 'Hide username' : 'Show username'}
-                        onClick={() => setShowUsername((prev) => !prev)}
-                        onMouseDown={(event) => event.preventDefault()}
-                        edge="end"
-                      >
-                        {showUsername ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              <TextField
-                margin="dense"
-                name="password"
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                fullWidth
-                defaultValue={editingOlt?.password || ''}
-                required
-                autoComplete="new-password"
-                inputProps={{
-                  autoComplete: 'new-password',
-                  'data-lpignore': 'true',
-                  'data-form-type': 'other',
-                }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        onClick={() => setShowPassword((prev) => !prev)}
-                        onMouseDown={(event) => event.preventDefault()}
-                        edge="end"
-                      >
-                        {showPassword ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Box>
-            <TextField
-              margin="dense"
-              name="logging_type"
-              label="Logging Type"
-              type="text"
-              fullWidth
-              defaultValue={editingOlt?.logging_type || 'syslog'}
-            />
-            <TextField
-              select
-              margin="dense"
-              name="enabled"
-              label="Enabled"
-              fullWidth
-              defaultValue={editingOlt?.enabled !== undefined ? String(editingOlt.enabled) : 'true'}
-            >
-              <MenuItem value="true">Yes</MenuItem>
-              <MenuItem value="false">No</MenuItem>
-            </TextField>
+            <FormDialogGrid>
+              <FormDialogItem>
+                <TextField autoFocus name="name" label="Name" type="text" fullWidth defaultValue={editingOlt?.name || ''} required />
+              </FormDialogItem>
+              <FormDialogItem>
+                <TextField
+                  select
+                  name="model_id"
+                  label="Model"
+                  fullWidth
+                  value={selectedModelId}
+                  onChange={(event) => setSelectedModelId(event.target.value)}
+                  required
+                >
+                  {oltModelsData?.data.map((model: any) => (
+                    <MenuItem key={model.id} value={model.id}>
+                      {model.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </FormDialogItem>
+              <FormDialogItem fullWidth>
+                <TextField name="description" label="Description" type="text" fullWidth multiline rows={3} defaultValue={editingOlt?.description || ''} required />
+              </FormDialogItem>
+              <FormDialogItem>
+                <TextField name="software_version" label="Software Version" type="text" fullWidth defaultValue={editingOlt?.software_version || ''} required />
+              </FormDialogItem>
+              <FormDialogItem>
+                <TextField name="ip_address_v4" label="IP Address" type="text" fullWidth defaultValue={editingOlt?.ip_address_v4 || ''} required />
+              </FormDialogItem>
+              <FormDialogItem>
+                <TextField name="sntp_ip_address" label="SNTP IP Address" type="text" fullWidth defaultValue={editingOlt?.sntp_ip_address || ''} required />
+              </FormDialogItem>
+              <FormDialogItem>
+                <TextField name="syslog_ip_address" label="Syslog IP Address" type="text" fullWidth defaultValue={editingOlt?.syslog_ip_address || ''} />
+              </FormDialogItem>
+              <FormDialogItem>
+                <TextField name="area" label="Area" type="text" fullWidth defaultValue={editingOlt?.area || ''} required />
+              </FormDialogItem>
+              <FormDialogItem>
+                <TextField select name="pop_id" label="POP" fullWidth defaultValue={editingOlt?.pop_id || ''} required>
+                  {popsData?.data.map((pop: any) => (
+                    <MenuItem key={pop.id} value={pop.id}>
+                      {pop.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </FormDialogItem>
+              <FormDialogItem>
+                <TextField name="logging_type" label="Logging Type" type="text" fullWidth defaultValue={editingOlt?.logging_type || 'syslog'} />
+              </FormDialogItem>
+              <FormDialogItem>
+                <TextField select name="enabled" label="Enabled" fullWidth defaultValue={editingOlt?.enabled !== undefined ? String(editingOlt.enabled) : 'true'}>
+                  <MenuItem value="true">Yes</MenuItem>
+                  <MenuItem value="false">No</MenuItem>
+                </TextField>
+              </FormDialogItem>
+              <FormDialogItem fullWidth>
+                <FormDialogSectionTitle>Credentials</FormDialogSectionTitle>
+                <FormDialogGrid>
+                  <FormDialogItem>
+                    <TextField
+                      name="username"
+                      label="Username"
+                      type={showUsername ? 'text' : 'password'}
+                      fullWidth
+                      defaultValue={editingOlt?.username || ''}
+                      required
+                      autoComplete="off"
+                      inputProps={{ autoComplete: 'off', 'data-lpignore': 'true', 'data-form-type': 'other' }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              aria-label={showUsername ? 'Hide username' : 'Show username'}
+                              onClick={() => setShowUsername((prev) => !prev)}
+                              onMouseDown={(event) => event.preventDefault()}
+                              edge="end"
+                            >
+                              {showUsername ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </FormDialogItem>
+                  <FormDialogItem>
+                    <TextField
+                      name="password"
+                      label="Password"
+                      type={showPassword ? 'text' : 'password'}
+                      fullWidth
+                      defaultValue={editingOlt?.password || ''}
+                      required
+                      autoComplete="new-password"
+                      inputProps={{ autoComplete: 'new-password', 'data-lpignore': 'true', 'data-form-type': 'other' }}
+                      InputProps={{
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton
+                              aria-label={showPassword ? 'Hide password' : 'Show password'}
+                              onClick={() => setShowPassword((prev) => !prev)}
+                              onMouseDown={(event) => event.preventDefault()}
+                              edge="end"
+                            >
+                              {showPassword ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }}
+                    />
+                  </FormDialogItem>
+                </FormDialogGrid>
+              </FormDialogItem>
+            </FormDialogGrid>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={formDialogActionsSx}>
             <Button onClick={handleClose}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary">
               Save
@@ -543,38 +573,90 @@ const Olts: React.FC = () => {
 
       <DetailDialog
         open={detailDialogOpen}
-        onClose={() => setDetailDialogOpen(false)}
+        onClose={handleCloseDetailDialog}
         title="OLT Details"
-        data={viewingOlt}
+        data={detailedViewingOlt}
+        extraContent={
+          <Box>
+            <Typography variant="h6" sx={{ mb: 1.5, fontWeight: 600 }}>
+              Initialization Process
+            </Typography>
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Process</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Started Date</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {isLoadingOltDetails || isLoadingWorkflowInstances ? (
+                    <TableRow>
+                      <TableCell colSpan={3}>
+                        <Box sx={{ display: 'flex', justifyContent: 'center', py: 1 }}>
+                          <CircularProgress size={20} />
+                        </Box>
+                      </TableCell>
+                    </TableRow>
+                  ) : initializationProcesses.length > 0 ? (
+                    initializationProcesses.map((process: any, index: number) => (
+                      <TableRow
+                        key={process.id || `${process.workflow_type || process.type || 'process'}-${index}`}
+                        hover={Boolean(process.id)}
+                        onClick={() => handleOpenWorkflowInstance(process)}
+                        sx={process.id ? { cursor: 'pointer' } : undefined}
+                      >
+                        <TableCell>
+                          {process.workflow_type || process.type || process.process || process.name || process.id || 'Initialization'}
+                        </TableCell>
+                        <TableCell>{formatOptional(process.status)}</TableCell>
+                        <TableCell>{formatTableDateTime(process.started_at)}</TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={3}>
+                        <Typography variant="body2" color="text.secondary">
+                          No initialization processes available.
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
+        }
         actions={
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Button
               onClick={handleTestReachability}
-              disabled={testingOlt || !viewingOlt?.id}
+              disabled={testingOlt || !detailedViewingOlt?.id}
               variant="outlined"
             >
               {testingOlt ? 'Testing...' : 'Test'}
             </Button>
             <Button
-              onClick={() => viewingOlt && handleStartInitializationWorkflow(viewingOlt)}
-              disabled={!viewingOlt?.id || startingWorkflowId === viewingOlt?.id}
+              onClick={() => detailedViewingOlt && handleStartInitializationWorkflow(detailedViewingOlt)}
+              disabled={!detailedViewingOlt?.id || startingWorkflowId === detailedViewingOlt?.id}
               variant="contained"
             >
-              {startingWorkflowId === viewingOlt?.id ? 'Starting...' : 'Start Initialization'}
+              {startingWorkflowId === detailedViewingOlt?.id ? 'Starting...' : 'Start Initialization'}
             </Button>
           </Box>
         }
         fieldActions={
-          viewingOlt?.pop_name && viewingOlt?.pop_name !== 'N/A'
+          detailedViewingOlt?.pop_name && detailedViewingOlt?.pop_name !== 'N/A'
             ? {
                 pop_name: {
                   icon: <MaterialSymbol name="open_in_new" fontSize="small" />,
                   label: 'Open POP details',
                   onClick: () => {
-                    const targetOlt = data?.data.find((olt: any) => olt.id === viewingOlt.id);
+                    const targetOlt = data?.data.find((olt: any) => olt.id === detailedViewingOlt.id);
                     const targetPop = popsData?.data.find((pop: any) => pop.id === targetOlt?.pop_id);
 
-                    setDetailDialogOpen(false);
+                    handleCloseDetailDialog();
                     navigate('/pops', {
                       state: {
                         openPopId: targetOlt?.pop_id,

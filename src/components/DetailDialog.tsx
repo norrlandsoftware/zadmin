@@ -6,7 +6,6 @@ import {
   DialogContent,
   DialogActions,
   Button,
-  Checkbox,
   Typography,
   Box,
   Grid,
@@ -14,6 +13,7 @@ import {
   CardContent,
   Divider,
   IconButton,
+  Chip,
 } from '@mui/material';
 import PopMap from './PopMap.tsx';
 
@@ -29,11 +29,33 @@ interface DetailDialogProps {
   title: string;
   data: any;
   actions?: React.ReactNode;
+  extraContent?: React.ReactNode;
   fieldActions?: Record<string, DetailDialogFieldAction>;
   fullWidthFields?: string[];
   htmlPreviewFields?: string[];
   preformattedFields?: string[];
 }
+
+const FIELD_LABEL_SX = {
+  fontWeight: 600,
+  textTransform: 'uppercase',
+  letterSpacing: 0.5,
+  display: 'block',
+  mb: 0.3,
+  fontSize: '0.7rem',
+} as const;
+
+const FIELD_BOX_SX = {
+  p: 0.5,
+  border: 1,
+  borderColor: 'divider',
+  borderRadius: 1,
+  minHeight: 34,
+  transition: 'border-color 0.2s',
+  '&:hover': {
+    borderColor: 'primary.main',
+  },
+} as const;
 
 const DetailDialog: React.FC<DetailDialogProps> = ({
   open,
@@ -41,6 +63,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   title,
   data,
   actions,
+  extraContent,
   fieldActions,
   fullWidthFields = [],
   htmlPreviewFields = [],
@@ -145,18 +168,20 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
     : [];
 
   const renderField = (key: string, value: any) => (
-    <Grid item xs={12} sm={fullWidthFields.includes(key) ? 12 : 6} key={key}>
+    <Grid item xs={12} sm={6} md={fullWidthFields.includes(key) ? 12 : 3} key={key}>
       <Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.5 }}>
+        <Box
+          sx={{
+            position: 'relative',
+            mb: 0.5,
+            minHeight: 18,
+            pr: fieldActions?.[key] ? 3 : 0,
+          }}
+        >
           <Typography
             variant="caption"
             color="primary.main"
-            sx={{
-              fontWeight: 600,
-              textTransform: 'uppercase',
-              letterSpacing: 0.5,
-              display: 'block',
-            }}
+            sx={FIELD_LABEL_SX}
           >
             {formatLabel(key)}
           </Typography>
@@ -165,30 +190,40 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
               size="small"
               aria-label={fieldActions[key].label}
               onClick={fieldActions[key].onClick}
+              sx={{
+                position: 'absolute',
+                top: -2,
+                right: 0,
+                p: 0.25,
+              }}
             >
               {fieldActions[key].icon}
             </IconButton>
           )}
         </Box>
-        <Box 
-          sx={{ 
-            p: 1,
-            border: 1,
-            borderColor: 'divider',
-            borderRadius: 1,
-            transition: 'border-color 0.2s',
-            '&:hover': {
-              borderColor: 'primary.main',
-            }
-          }}
-        >
+        <Box sx={FIELD_BOX_SX}>
           {((key === 'is_active') || (key === 'enabled')) && typeof value === 'boolean' ? (
-            <Checkbox
-              checked={value}
-              disabled
+            <Chip
               size="small"
-              sx={{ p: 0, color: 'text.disabled' }}
+              label={value ? 'Yes' : 'No'}
+              color={value ? 'success' : 'default'}
+              variant={value ? 'filled' : 'outlined'}
+              sx={{ height: 22, fontSize: '0.75rem' }}
             />
+          ) : key === 'last_login' ? (
+            <Typography
+              variant="body2"
+              component="div"
+              sx={{
+                wordBreak: 'break-word',
+                color: value ? 'text.primary' : 'text.disabled',
+                flex: 1,
+                fontSize: '0.82rem',
+                lineHeight: 1.35,
+              }}
+            >
+              {formatDateValue(value)}
+            </Typography>
           ) : (
             <Box>
               {preformattedFields.includes(key) && typeof value === 'string' ? (
@@ -198,9 +233,9 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
                     sx={{
                       wordBreak: 'break-word',
                       color: 'text.primary',
-                      fontSize: '0.8rem',
+                      fontSize: '0.82rem',
                       whiteSpace: 'pre-wrap',
-                      lineHeight: 1.45,
+                      lineHeight: 1.35,
                       maxHeight: '7.8em',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -235,15 +270,17 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
                 </Box>
               ) : (
                 <Typography
-                  variant="body1"
+                  variant="body2"
                   component="div"
                   sx={{
                     wordBreak: 'break-word',
                     color: value ? 'text.primary' : 'text.disabled',
                     flex: 1,
+                    fontSize: '0.82rem',
+                    lineHeight: 1.35,
                   }}
                 >
-                  {key === 'last_login' ? formatDateValue(value) : formatValue(value)}
+                  {formatValue(value)}
                 </Typography>
               )}
               {htmlPreviewFields.includes(key) && typeof value === 'string' && value.trim() && (
@@ -257,7 +294,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
                   </Typography>
                   <Box
                     sx={{
-                      p: 2,
+                      p: 1.5,
                       border: 1,
                       borderColor: 'divider',
                       borderRadius: 1,
@@ -278,7 +315,14 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   const renderObjectField = (key: string, value: Record<string, any>) => (
     <Grid item xs={12} key={key}>
       <Box>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1, mb: 0.5 }}>
+        <Box
+          sx={{
+            position: 'relative',
+            mb: 0.5,
+            minHeight: 18,
+            pr: fieldActions?.[key] ? 3 : 0,
+          }}
+        >
           <Typography
             variant="caption"
             color="primary.main"
@@ -296,6 +340,12 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
               size="small"
               aria-label={fieldActions[key].label}
               onClick={fieldActions[key].onClick}
+              sx={{
+                position: 'absolute',
+                top: -2,
+                right: 0,
+                p: 0.25,
+              }}
             >
               {fieldActions[key].icon}
             </IconButton>
@@ -303,7 +353,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
         </Box>
         <Box
           sx={{
-            p: 1.5,
+            p: 0.75,
             border: 1,
             borderColor: 'divider',
             borderRadius: 1,
@@ -350,7 +400,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
               </Box>
             </Box>
           ) : (
-            <Grid container spacing={1.5}>
+            <Grid container spacing={1}>
               {Object.entries(value).length > 0 ? (
                 Object.entries(value).map(([objectKey, objectValue]) => {
                   const normalizedKey = objectKey.replace(/[\s_]/g, '').toLowerCase();
@@ -361,11 +411,11 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
                   const isVisible = !!visibleConfigSecrets[visibilityKey];
 
                   return (
-                    <Grid item xs={12} sm={6} key={objectKey}>
+                    <Grid item xs={12} sm={6} md={3} key={objectKey}>
                       <Typography
                         variant="caption"
                         color="text.secondary"
-                        sx={{ display: 'block', mb: 0.25, fontWeight: 600 }}
+                        sx={{ display: 'block', mb: 0.25, fontWeight: 600, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: 0.5 }}
                       >
                         {formatLabel(objectKey)}
                       </Typography>
@@ -380,7 +430,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
                         >
                           <Typography
                             variant="body2"
-                            sx={{ wordBreak: 'break-word', color: 'text.primary', flex: 1 }}
+                            sx={{ wordBreak: 'break-word', color: 'text.primary', flex: 1, fontSize: '0.82rem', lineHeight: 1.35 }}
                           >
                             {isVisible
                               ? formatValue(objectValue)
@@ -410,7 +460,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
                       ) : (
                         <Typography
                           variant="body2"
-                          sx={{ wordBreak: 'break-word', color: 'text.primary' }}
+                          sx={{ wordBreak: 'break-word', color: 'text.primary', fontSize: '0.82rem', lineHeight: 1.35 }}
                         >
                           {formatValue(objectValue)}
                         </Typography>
@@ -438,43 +488,24 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
     visible: boolean,
     onToggle: () => void
   ) => (
-    <Grid item xs={12} sm={6} key={key}>
+    <Grid item xs={12} sm={6} md={3} key={key}>
       <Box>
         <Typography
           variant="caption"
           color="primary.main"
-          sx={{
-            fontWeight: 600,
-            textTransform: 'uppercase',
-            letterSpacing: 0.5,
-            display: 'block',
-            mb: 0.5,
-          }}
+          sx={FIELD_LABEL_SX}
         >
           {formatLabel(key)}
         </Typography>
-        <Box
-          sx={{
-            p: 1,
-            border: 1,
-            borderColor: 'divider',
-            borderRadius: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 1,
-            transition: 'border-color 0.2s',
-            '&:hover': {
-              borderColor: 'primary.main',
-            },
-          }}
-        >
+        <Box sx={{ ...FIELD_BOX_SX, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
           <Typography
-            variant="body1"
+            variant="body2"
             sx={{
               wordBreak: 'break-word',
               color: value ? 'text.primary' : 'text.disabled',
               flex: 1,
+              fontSize: '0.82rem',
+              lineHeight: 1.35,
             }}
           >
             {visible ? formatValue(value) : value ? '••••••••' : 'N/A'}
@@ -495,17 +526,17 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
         <DialogTitle sx={{ pb: 1 }}>
           <Typography variant="h5" component="div" sx={{ fontWeight: 600 }}>
             {title}
           </Typography>
         </DialogTitle>
         <Divider />
-        <DialogContent sx={{ pt: 3 }}>
+        <DialogContent sx={{ pt: 2 }}>
           <Card variant="outlined" sx={{ mb: 2 }}>
-            <CardContent>
-              <Grid container spacing={3}>
+            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+              <Grid container spacing={1.5}>
                 {contentEntries.map(([key, value]) =>
                   value && typeof value === 'object' && !Array.isArray(value)
                     ? renderObjectField(key, value as Record<string, any>)
@@ -517,7 +548,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
                       <Typography variant="subtitle2" sx={{ mb: 1 }}>
                         Credentials
                       </Typography>
-                      <Grid container spacing={3}>
+                      <Grid container spacing={1.5}>
                         {credentialsEntries.map(([key, value]) =>
                           key === 'username'
                             ? renderSensitiveField('username', value, showUsername, () =>
@@ -550,17 +581,17 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
             <Box sx={{ mt: 2, px: 1 }}>
               <Grid container spacing={1.5}>
                 {metadataEntries.map(([key, value]) => (
-                  <Grid item xs={12} sm={4} key={key}>
+                  <Grid item xs={12} sm={6} md={3} key={key}>
                     <Typography
                       variant="caption"
                       color="primary.main"
-                      sx={{ display: 'block', mb: 0.25, fontWeight: 600 }}
+                      sx={FIELD_LABEL_SX}
                     >
                       {formatLabel(key)}
                     </Typography>
                     <Typography
                       variant="body2"
-                      sx={{ wordBreak: 'break-word', color: 'text.primary' }}
+                      sx={{ wordBreak: 'break-word', color: 'text.primary', fontSize: '0.82rem', lineHeight: 1.35 }}
                     >
                       {key === 'created_at' || key === 'updated_at'
                         ? formatDateValue(value)
@@ -571,6 +602,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
               </Grid>
             </Box>
           )}
+          {extraContent && <Box sx={{ mt: 3 }}>{extraContent}</Box>}
         </DialogContent>
         <Divider />
         <DialogActions sx={{ px: 3, py: 2 }}>

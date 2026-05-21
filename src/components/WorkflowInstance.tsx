@@ -1,5 +1,19 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Box, Button, Chip, LinearProgress, Paper, Stack, TextField, Typography } from '@mui/material';
+import MaterialSymbol from './MaterialSymbol.tsx';
+import DetailDialog from './DetailDialog.tsx';
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  Collapse,
+  IconButton,
+  LinearProgress,
+  Paper,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material';
 
 interface WorkflowInstanceProps {
   instance: any;
@@ -16,6 +30,74 @@ const statusColor = (status: string) => {
   return 'default';
 };
 
+const formatDateTime = (value?: string | null) => {
+  if (!value) {
+    return 'N/A';
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(date);
+};
+
+const formatDuration = (startedAt?: string | null, finishedAt?: string | null) => {
+  if (!startedAt) {
+    return 'N/A';
+  }
+
+  const start = new Date(startedAt);
+  const end = finishedAt ? new Date(finishedAt) : new Date();
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return 'N/A';
+  }
+
+  const totalSeconds = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${seconds}s`;
+  }
+
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+
+  return `${seconds}s`;
+};
+
+const buildResultText = (action: any, latestAttempt: any) =>
+  latestAttempt?.error ||
+  latestAttempt?.progress ||
+  latestAttempt?.note ||
+  latestAttempt?.status ||
+  action.state ||
+  'No result available.';
+
+const renderJsonLikeValue = (value: any) => {
+  if (value === null || value === undefined || value === '') {
+    return 'N/A';
+  }
+
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  return JSON.stringify(value, null, 2);
+};
+
 const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
   instance,
   readOnly = false,
@@ -24,7 +106,8 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
   onRetryAutomatic,
 }) => {
   const [noteByAction, setNoteByAction] = useState<Record<string, string>>({});
-  const [visibleConfigByAction, setVisibleConfigByAction] = useState<Record<string, boolean>>({});
+  const [expandedByAction, setExpandedByAction] = useState<Record<string, boolean>>({});
+  const [configDialogData, setConfigDialogData] = useState<{ title: string; data: any } | null>(null);
 
   const progress = useMemo(() => {
     const actions = instance?.actions || [];
@@ -38,109 +121,305 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
   }
 
   return (
-    <Stack spacing={2}>
-      <Paper variant="outlined" sx={{ p: 2 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }} spacing={1}>
-          <Typography variant="h6">{instance.workflow_type}</Typography>
-          <Chip size="small" label={instance.status} color={statusColor(instance.status) as any} />
-        </Stack>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-          Started at: {new Date(instance.started_at).toLocaleString()}
-        </Typography>
-        {instance.finished_at && (
-          <Typography variant="body2" color="text.secondary">
-            Finished at: {new Date(instance.finished_at).toLocaleString()}
+    <>
+      <Stack spacing={2}>
+        <Paper variant="outlined" sx={{ px: 1.5, py: 1.1 }}>
+          <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }} spacing={1}>
+            <Typography variant="h6" sx={{ fontSize: '1.05rem' }}>{instance.workflow_type}</Typography>
+            <Chip size="small" label={instance.status} color={statusColor(instance.status) as any} />
+          </Stack>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Started at: {formatDateTime(instance.started_at)}
           </Typography>
-        )}
-        {instance.stop_reason && (
-          <Alert severity="warning" sx={{ mt: 1 }}>
-            Stop reason: {instance.stop_reason}
-          </Alert>
-        )}
-        <Box sx={{ mt: 1.5 }}>
-          <LinearProgress variant="determinate" value={progress} />
-          <Typography variant="caption" color="text.secondary">{progress}% completed</Typography>
-        </Box>
-      </Paper>
+          {instance.finished_at && (
+            <Typography variant="body2" color="text.secondary">
+              Finished at: {formatDateTime(instance.finished_at)}
+            </Typography>
+          )}
+          {instance.stop_reason && (
+            <Alert severity="warning" sx={{ mt: 1 }}>
+              Stop reason: {instance.stop_reason}
+            </Alert>
+          )}
+          <Box sx={{ mt: 1.5 }}>
+            <LinearProgress variant="determinate" value={progress} />
+            <Typography variant="caption" color="text.secondary">{progress}% completed</Typography>
+          </Box>
+        </Paper>
 
-      {(instance.actions || []).map((action: any) => {
-        const latestAttempt = action.attempts?.length ? action.attempts[action.attempts.length - 1] : null;
-        const latestStatus = latestAttempt?.status || action.state || 'NOT_STARTED';
-        const configName = action.action_meta?.rendered_config_name;
-        const cfg = configName ? renderedConfigByName[configName] : '';
-        const canManual = !readOnly && action.is_current && action.manual_task && instance.status === 'RUNNING' && onManualAction;
-        const canRetryAuto = !readOnly && action.is_current && !action.manual_task && action.state === 'FAILED' && instance.status === 'RUNNING' && onRetryAutomatic;
+        {(instance.actions || []).map((action: any) => {
+          const latestAttempt = action.attempts?.length ? action.attempts[action.attempts.length - 1] : null;
+          const latestStatus = latestAttempt?.status || action.state || 'NOT_STARTED';
+          const configName = action.action_meta?.rendered_config_name;
+          const cfg = configName ? renderedConfigByName[configName] : '';
+          const canManual = !readOnly && action.is_current && action.manual_task && instance.status === 'RUNNING' && onManualAction;
+          const canRetryAuto = !readOnly && action.is_current && !action.manual_task && action.state === 'FAILED' && instance.status === 'RUNNING' && onRetryAutomatic;
+          const isExpanded = Boolean(expandedByAction[action.code]);
+          const resultText = buildResultText(action, latestAttempt);
 
-        return (
-          <Paper key={action.code} variant="outlined" sx={{ p: 2 }}>
-            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }} spacing={1}>
-              <Typography variant="subtitle1">{action.sequence}. {action.description}</Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
-                {action.is_current && <Chip size="small" label="CURRENT" color="primary" />}
-                <Chip size="small" label={latestStatus} color={statusColor(latestStatus) as any} />
+          return (
+            <Paper key={action.code} variant="outlined" sx={{ px: 1.5, py: 0.9 }}>
+              <Stack spacing={isExpanded ? 1 : 0}>
+                <Stack
+                  direction={{ xs: 'column', md: 'row' }}
+                  justifyContent="space-between"
+                  alignItems={{ xs: 'stretch', md: 'center' }}
+                  spacing={1}
+                >
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: '0.98rem', lineHeight: 1.3 }}>
+                      {action.sequence}. {action.description}
+                    </Typography>
+                  </Box>
+
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  justifyContent={{ xs: 'flex-start', md: 'flex-end' }}
+                    flexWrap="wrap"
+                    useFlexGap
+                  >
+                    {cfg && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() =>
+                          setConfigDialogData({
+                            title: `Rendered Configuration - ${configName || action.description}`,
+                            data: {
+                              name: configName || action.description,
+                              configuration: cfg,
+                            },
+                          })
+                        }
+                      >
+                        Show Config
+                      </Button>
+                    )}
+
+                    {canRetryAuto && (
+                      <Button size="small" variant="contained" color="warning" onClick={() => onRetryAutomatic(action.code)}>
+                        Retry
+                      </Button>
+                    )}
+
+                    {action.is_current && <Chip size="small" label="CURRENT" color="primary" />}
+                    <Chip size="small" label={latestStatus} color={statusColor(latestStatus) as any} />
+                    <IconButton
+                      size="small"
+                      aria-label={isExpanded ? 'Collapse task details' : 'Expand task details'}
+                      onClick={() =>
+                        setExpandedByAction((prev) => ({
+                          ...prev,
+                          [action.code]: !prev[action.code],
+                        }))
+                      }
+                      sx={{ ml: { md: 0.5 } }}
+                    >
+                      <MaterialSymbol name={isExpanded ? 'expand_less' : 'expand_more'} fontSize="small" />
+                    </IconButton>
+                  </Stack>
+                </Stack>
+
+                {canManual && (
+                  <Stack
+                    direction={{ xs: 'column', md: 'row' }}
+                    spacing={1}
+                    alignItems={{ xs: 'stretch', md: 'center' }}
+                  >
+                    <TextField
+                      size="small"
+                      label="Note"
+                      value={noteByAction[action.code] || ''}
+                      onChange={(event) => setNoteByAction((prev) => ({ ...prev, [action.code]: event.target.value }))}
+                      sx={{ minWidth: { md: 220 } }}
+                    />
+                    <Button size="small" variant="contained" color="success" onClick={() => onManualAction(action.code, true, noteByAction[action.code])}>
+                      Mark Done
+                    </Button>
+                    <Button size="small" variant="outlined" color="error" onClick={() => onManualAction(action.code, false, noteByAction[action.code])}>
+                      Mark Failed
+                    </Button>
+                  </Stack>
+                )}
+
+                <Collapse in={isExpanded}>
+                  <Stack spacing={1} sx={{ pt: 0.75 }}>
+                    <Box
+                      sx={{
+                        px: 1,
+                        py: 0.75,
+                        borderRadius: 1,
+                        bgcolor: latestAttempt?.error ? 'error.50' : 'grey.100',
+                        border: 1,
+                        borderColor: latestAttempt?.error ? 'error.200' : 'divider',
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-word',
+                          color: 'text.primary',
+                          fontSize: '0.83rem',
+                          lineHeight: 1.35,
+                        }}
+                      >
+                        {resultText}
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' } }}>
+                      <Box>
+                        <Typography variant="caption" color="primary.main" sx={{ fontWeight: 600, textTransform: 'uppercase' }}>
+                          Task Code
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.83rem' }}>{action.code}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="primary.main" sx={{ fontWeight: 600, textTransform: 'uppercase' }}>
+                          Attempts
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.83rem' }}>{action.attempts?.length || 0}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="primary.main" sx={{ fontWeight: 600, textTransform: 'uppercase' }}>
+                          Start Date
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.83rem' }}>{formatDateTime(latestAttempt?.started_at)}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="primary.main" sx={{ fontWeight: 600, textTransform: 'uppercase' }}>
+                          End Date
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.83rem' }}>{formatDateTime(latestAttempt?.finished_at)}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="primary.main" sx={{ fontWeight: 600, textTransform: 'uppercase' }}>
+                          Duration
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.83rem' }}>{formatDuration(latestAttempt?.started_at, latestAttempt?.finished_at)}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography variant="caption" color="primary.main" sx={{ fontWeight: 600, textTransform: 'uppercase' }}>
+                          Manual Task
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.83rem' }}>{action.manual_task ? 'Yes' : 'No'}</Typography>
+                      </Box>
+                    </Box>
+
+                    {action.attempts?.length > 0 && (
+                      <Box>
+                        <Typography variant="caption" color="primary.main" sx={{ fontWeight: 600, textTransform: 'uppercase', display: 'block', mb: 0.5 }}>
+                          Attempts History
+                        </Typography>
+                        <Stack spacing={0.6}>
+                          {action.attempts.map((attempt: any) => (
+                            <Box
+                              key={attempt.id || `${action.code}-${attempt.attempt}`}
+                              sx={{ p: 0.85, border: 1, borderColor: 'divider', borderRadius: 1 }}
+                            >
+                              <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={0.5}>
+                                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.83rem' }}>
+                                  Attempt {attempt.attempt}
+                                </Typography>
+                                <Chip size="small" label={attempt.status || 'N/A'} color={statusColor(attempt.status || '') as any} />
+                              </Stack>
+                              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, fontSize: '0.8rem' }}>
+                                {formatDateTime(attempt.started_at)} - {formatDateTime(attempt.finished_at)}
+                              </Typography>
+                              <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+                                Duration: {formatDuration(attempt.started_at, attempt.finished_at)}
+                              </Typography>
+                              {attempt.executed_by && (
+                                <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+                                  Executed by: {attempt.executed_by}
+                                </Typography>
+                              )}
+                              {(attempt.progress || attempt.error || attempt.note) && (
+                                <Typography variant="body2" sx={{ mt: 0.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: '0.82rem' }}>
+                                  {attempt.error || attempt.progress || attempt.note}
+                                </Typography>
+                              )}
+                              {attempt.details && (
+                                <Box sx={{ mt: 0.5 }}>
+                                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.25 }}>
+                                    Details
+                                  </Typography>
+                                  <Box sx={{ p: 0.65, borderRadius: 1, bgcolor: 'grey.100' }}>
+                                    <Typography
+                                      variant="body2"
+                                      sx={{
+                                        whiteSpace: 'pre-wrap',
+                                        wordBreak: 'break-word',
+                                        fontFamily:
+                                          'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                                        fontSize: '0.8rem',
+                                      }}
+                                    >
+                                      {renderJsonLikeValue(attempt.details)}
+                                    </Typography>
+                                  </Box>
+                                </Box>
+                              )}
+                            </Box>
+                          ))}
+                        </Stack>
+                      </Box>
+                    )}
+
+                    {action.action_meta && (
+                      <Box>
+                        <Typography variant="caption" color="primary.main" sx={{ fontWeight: 600, textTransform: 'uppercase', display: 'block', mb: 0.5 }}>
+                          Other Details
+                        </Typography>
+                        <Box sx={{ p: 1, border: 1, borderColor: 'divider', borderRadius: 1, bgcolor: 'background.default' }}>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              whiteSpace: 'pre-wrap',
+                              wordBreak: 'break-word',
+                              fontFamily:
+                                'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                              fontSize: '0.8rem',
+                            }}
+                          >
+                            {renderJsonLikeValue(action.action_meta)}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )}
+                  </Stack>
+                </Collapse>
               </Stack>
-            </Stack>
-            <Typography variant="body2" color="text.secondary">{action.code}</Typography>
+            </Paper>
+          );
+        })}
+      </Stack>
 
-            {latestAttempt?.progress && <Alert severity="info" sx={{ mt: 1 }}>{latestAttempt.progress}</Alert>}
-            {latestAttempt?.error && <Alert severity="error" sx={{ mt: 1 }}>{latestAttempt.error}</Alert>}
-
-            {!!action.attempts?.length && (
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                Attempts: {action.attempts.length}
-              </Typography>
-            )}
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={1} sx={{ mt: 1.25 }}>
-              {cfg && (
-                <>
-                  <Button size="small" variant="outlined" onClick={() => setVisibleConfigByAction((prev) => ({ ...prev, [action.code]: !prev[action.code] }))}>
-                    {visibleConfigByAction[action.code] ? 'Hide Config' : 'Show Config'}
-                  </Button>
-                  <Button size="small" variant="outlined" onClick={() => navigator.clipboard.writeText(cfg)}>
-                    Copy Config
-                  </Button>
-                </>
-              )}
-
-              {canManual && (
-                <>
-                  <TextField
-                    size="small"
-                    label="Note"
-                    value={noteByAction[action.code] || ''}
-                    onChange={(event) => setNoteByAction((prev) => ({ ...prev, [action.code]: event.target.value }))}
-                  />
-                  <Button size="small" variant="contained" color="success" onClick={() => onManualAction(action.code, true, noteByAction[action.code])}>
-                    Mark Done
-                  </Button>
-                  <Button size="small" variant="outlined" color="error" onClick={() => onManualAction(action.code, false, noteByAction[action.code])}>
-                    Mark Failed
-                  </Button>
-                </>
-              )}
-
-              {canRetryAuto && (
-                <Button size="small" variant="contained" color="warning" onClick={() => onRetryAutomatic(action.code)}>
-                  Retry
-                </Button>
-              )}
-            </Stack>
-
-            {cfg && visibleConfigByAction[action.code] && (
-              <TextField
-                sx={{ mt: 1.5 }}
-                fullWidth
-                multiline
-                minRows={10}
-                value={cfg}
-                InputProps={{ readOnly: true }}
-              />
-            )}
-          </Paper>
-        );
-      })}
-    </Stack>
+      <DetailDialog
+        open={Boolean(configDialogData)}
+        onClose={() => setConfigDialogData(null)}
+        title={configDialogData?.title || 'Rendered Configuration'}
+        data={configDialogData?.data}
+        fieldActions={
+          configDialogData
+            ? {
+                configuration: {
+                  icon: <MaterialSymbol name="content_copy" fontSize="small" />,
+                  label: 'Copy configuration',
+                  onClick: async () => {
+                    await navigator.clipboard.writeText(String(configDialogData.data?.configuration || '').replace(/\\n/g, '\n'));
+                  },
+                },
+              }
+            : undefined
+        }
+        fullWidthFields={['configuration']}
+        preformattedFields={['configuration']}
+      />
+    </>
   );
 };
 

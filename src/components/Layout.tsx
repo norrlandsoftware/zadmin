@@ -19,6 +19,16 @@ import {
 import { useAuth } from '../contexts/AuthContext.tsx';
 
 const drawerWidth = 240;
+const menuItemSx = {
+  minHeight: 38,
+  py: 0.25,
+  px: 1.5,
+} as const;
+
+const nestedMenuItemSx = {
+  minHeight: 34,
+  py: 0.125,
+} as const;
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -100,62 +110,63 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
           style={{ maxWidth: '80%', height: 'auto', maxHeight: '50px' }}
         />
       </Toolbar>
-      <List>
+      <List sx={{ py: 0.5 }}>
         {menuItems.map((item) => (
           <ListItem
             button
             key={item.text}
+            sx={menuItemSx}
             onClick={() => {
               navigate(item.path);
               setMobileOpen(false);
             }}
           >
-            <ListItemIcon sx={{ color: 'primary.main' }}>{item.icon}</ListItemIcon>
-            <ListItemText primary={item.text} />
+            <ListItemIcon sx={{ color: 'primary.main', minWidth: 34 }}>{item.icon}</ListItemIcon>
+            <ListItemText primary={item.text} primaryTypographyProps={{ fontSize: '0.9rem' }} />
           </ListItem>
         ))}
-        <ListItem button onClick={handleAdminToggle}>
-          <ListItemIcon sx={{ color: 'primary.main' }}>
+        <ListItem button onClick={handleAdminToggle} sx={menuItemSx}>
+          <ListItemIcon sx={{ color: 'primary.main', minWidth: 34 }}>
             <MaterialSymbol name="admin_panel_settings" />
           </ListItemIcon>
-          <ListItemText primary="Admin" />
+          <ListItemText primary="Admin" primaryTypographyProps={{ fontSize: '0.9rem' }} />
           {adminOpen ? <MaterialSymbol name="expand_less" /> : <MaterialSymbol name="expand_more" />}
         </ListItem>
         <Collapse in={adminOpen} timeout="auto" unmountOnExit={false}>
-          <List component="div" disablePadding>
+          <List component="div" disablePadding sx={{ py: 0 }}>
             <ListItem
               button
-              sx={{ pl: 4 }}
+              sx={{ ...nestedMenuItemSx, pl: 3.5 }}
               onClick={() => {
                 navigate('/about');
                 setMobileOpen(false);
               }}
             >
-              <ListItemIcon sx={{ minWidth: 36, color: 'primary.main' }}>
+              <ListItemIcon sx={{ minWidth: 32, color: 'primary.main' }}>
                 <MaterialSymbol name="info" />
               </ListItemIcon>
               <ListItemText
                 primary="About"
-                primaryTypographyProps={{ fontSize: '0.875rem' }}
+                primaryTypographyProps={{ fontSize: '0.84rem' }}
               />
             </ListItem>
-            <ListItem button sx={{ pl: 4 }} onClick={handleDeviceModelsToggle}>
-              <ListItemIcon sx={{ minWidth: 36, color: 'primary.main' }}>
+            <ListItem button sx={{ ...nestedMenuItemSx, pl: 3.5 }} onClick={handleDeviceModelsToggle}>
+              <ListItemIcon sx={{ minWidth: 32, color: 'primary.main' }}>
                 <MaterialSymbol name="developer_board" />
               </ListItemIcon>
               <ListItemText
                 primary="Device Models"
-                primaryTypographyProps={{ fontSize: '0.875rem' }}
+                primaryTypographyProps={{ fontSize: '0.84rem' }}
               />
               {deviceModelsOpen ? <MaterialSymbol name="expand_less" /> : <MaterialSymbol name="expand_more" />}
             </ListItem>
             <Collapse in={deviceModelsOpen} timeout="auto" unmountOnExit={false}>
-              <List component="div" disablePadding>
+              <List component="div" disablePadding sx={{ py: 0 }}>
                 {deviceModelMenuItems.map((item) => (
                   <ListItem
                     button
                     key={item.text}
-                    sx={{ pl: 7 }}
+                    sx={{ ...nestedMenuItemSx, pl: 6 }}
                     onClick={() => {
                       navigate(item.path);
                       setMobileOpen(false);
@@ -163,7 +174,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
                   >
                     <ListItemText
                       primary={item.text}
-                      primaryTypographyProps={{ fontSize: '0.8125rem' }}
+                      primaryTypographyProps={{ fontSize: '0.8rem' }}
                     />
                   </ListItem>
                 ))}
@@ -175,16 +186,16 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
               <ListItem
                 button
                 key={item.text}
-                sx={{ pl: 4 }}
+                sx={{ ...nestedMenuItemSx, pl: 3.5 }}
                 onClick={() => {
                   navigate(item.path);
                   setMobileOpen(false);
                 }}
               >
-                <ListItemIcon sx={{ minWidth: 36, color: 'primary.main' }}>{item.icon}</ListItemIcon>
+                <ListItemIcon sx={{ minWidth: 32, color: 'primary.main' }}>{item.icon}</ListItemIcon>
                 <ListItemText
                   primary={item.text}
-                  primaryTypographyProps={{ fontSize: '0.875rem' }}
+                  primaryTypographyProps={{ fontSize: '0.84rem' }}
                 />
               </ListItem>
             ))}

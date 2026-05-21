@@ -20,6 +20,7 @@ import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
 import PopMap from '../components/PopMap.tsx';
+import { FormDialogGrid, FormDialogItem, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import { pops } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
@@ -280,91 +281,22 @@ const Pops: React.FC = () => {
         />
       )}
 
-      <Dialog open={dialogOpen} onClose={handleClose}>
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
         <form onSubmit={handleSave}>
-          <DialogTitle>
+          <DialogTitle sx={formDialogTitleSx}>
             {editingPop ? 'Edit POP' : 'Create New POP'}
           </DialogTitle>
-          <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              name="name"
-              label="Name"
-              type="text"
-              fullWidth
-              value={popForm.name || ''}
-              onChange={(e) => setPopForm((current) => ({ ...current, name: e.target.value }))}
-              required
-            />
-            <TextField
-              margin="dense"
-              name="address"
-              label="Address"
-              type="text"
-              fullWidth
-              value={popForm.address || ''}
-              onChange={(e) => setPopForm((current) => ({ ...current, address: e.target.value }))}
-              required
-            />
-            <TextField
-              margin="dense"
-              name="postal_code"
-              label="Postal Code"
-              type="text"
-              fullWidth
-              value={popForm.postal_code || ''}
-              onChange={(e) => setPopForm((current) => ({ ...current, postal_code: e.target.value }))}
-            />
-            <TextField
-              margin="dense"
-              name="city"
-              label="City"
-              type="text"
-              fullWidth
-              value={popForm.city || ''}
-              onChange={(e) => setPopForm((current) => ({ ...current, city: e.target.value }))}
-              required
-            />
-            <TextField
-              margin="dense"
-              name="province"
-              label="Province"
-              type="text"
-              fullWidth
-              value={popForm.province || ''}
-              onChange={(e) => setPopForm((current) => ({ ...current, province: e.target.value }))}
-            />
-            <TextField
-              margin="dense"
-              name="country"
-              label="Country"
-              type="text"
-              fullWidth
-              value={popForm.country || ''}
-              onChange={(e) => setPopForm((current) => ({ ...current, country: e.target.value }))}
-              required
-            />
-            <TextField
-              margin="dense"
-              name="latitude"
-              label="Latitude"
-              type="text"
-              fullWidth
-              value={popForm.latitude || ''}
-              onChange={(e) => setPopForm((current) => ({ ...current, latitude: e.target.value }))}
-              helperText={geocodeLoading ? 'Resolving address...' : geocodeError || ' '}
-              error={Boolean(geocodeError)}
-            />
-            <TextField
-              margin="dense"
-              name="longitude"
-              label="Longitude"
-              type="text"
-              fullWidth
-              value={popForm.longitude || ''}
-              onChange={(e) => setPopForm((current) => ({ ...current, longitude: e.target.value }))}
-            />
+          <DialogContent sx={formDialogContentSx}>
+            <FormDialogGrid>
+              <FormDialogItem><TextField autoFocus name="name" label="Name" type="text" fullWidth value={popForm.name || ''} onChange={(e) => setPopForm((current) => ({ ...current, name: e.target.value }))} required /></FormDialogItem>
+              <FormDialogItem><TextField name="address" label="Address" type="text" fullWidth value={popForm.address || ''} onChange={(e) => setPopForm((current) => ({ ...current, address: e.target.value }))} required /></FormDialogItem>
+              <FormDialogItem><TextField name="postal_code" label="Postal Code" type="text" fullWidth value={popForm.postal_code || ''} onChange={(e) => setPopForm((current) => ({ ...current, postal_code: e.target.value }))} /></FormDialogItem>
+              <FormDialogItem><TextField name="city" label="City" type="text" fullWidth value={popForm.city || ''} onChange={(e) => setPopForm((current) => ({ ...current, city: e.target.value }))} required /></FormDialogItem>
+              <FormDialogItem><TextField name="province" label="Province" type="text" fullWidth value={popForm.province || ''} onChange={(e) => setPopForm((current) => ({ ...current, province: e.target.value }))} /></FormDialogItem>
+              <FormDialogItem><TextField name="country" label="Country" type="text" fullWidth value={popForm.country || ''} onChange={(e) => setPopForm((current) => ({ ...current, country: e.target.value }))} required /></FormDialogItem>
+              <FormDialogItem><TextField name="latitude" label="Latitude" type="text" fullWidth value={popForm.latitude || ''} onChange={(e) => setPopForm((current) => ({ ...current, latitude: e.target.value }))} helperText={geocodeLoading ? 'Resolving address...' : geocodeError || ' '} error={Boolean(geocodeError)} /></FormDialogItem>
+              <FormDialogItem><TextField name="longitude" label="Longitude" type="text" fullWidth value={popForm.longitude || ''} onChange={(e) => setPopForm((current) => ({ ...current, longitude: e.target.value }))} /></FormDialogItem>
+            </FormDialogGrid>
             {popForm.latitude && popForm.longitude && !Number.isNaN(Number(popForm.latitude)) && !Number.isNaN(Number(popForm.longitude)) && (
               <Box sx={{ mt: 2 }}>
                 <PopMap
@@ -392,7 +324,7 @@ const Pops: React.FC = () => {
               </Box>
             )}
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={formDialogActionsSx}>
             <Button onClick={handleClose}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary">
               Save

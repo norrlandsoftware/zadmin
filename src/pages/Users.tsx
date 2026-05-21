@@ -15,6 +15,7 @@ import {
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import { FormDialogGrid, FormDialogItem, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import { users } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
@@ -123,53 +124,24 @@ const Users: React.FC = () => {
         onEdit={handleEdit}
       />
 
-      <Dialog open={dialogOpen} onClose={handleClose}>
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
         <form onSubmit={handleSave}>
-          <DialogTitle>
+          <DialogTitle sx={formDialogTitleSx}>
             {editingUser ? 'Edit User' : 'Create New User'}
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={formDialogContentSx}>
             {formError && (
               <Alert severity="error" sx={{ mb: 2, mt: 1 }}>
                 {formError}
               </Alert>
             )}
-            <TextField
-              autoFocus
-              margin="dense"
-              name="full_name"
-              label="Full Name"
-              type="text"
-              fullWidth
-              defaultValue={editingUser?.full_name || ''}
-              required
-            />
-            <TextField
-              margin="dense"
-              name="email"
-              label="Email"
-              type="email"
-              fullWidth
-              defaultValue={editingUser?.email || ''}
-              required
-            />
-            <TextField
-              select
-              margin="dense"
-              name="role"
-              label="Role"
-              fullWidth
-              defaultValue={editingUser?.role || ''}
-              required
-            >
-              {availableRoles.map((role) => (
-                <MenuItem key={role} value={role}>
-                  {role}
-                </MenuItem>
-              ))}
-            </TextField>
+            <FormDialogGrid>
+              <FormDialogItem><TextField autoFocus name="full_name" label="Full Name" type="text" fullWidth defaultValue={editingUser?.full_name || ''} required /></FormDialogItem>
+              <FormDialogItem><TextField name="email" label="Email" type="email" fullWidth defaultValue={editingUser?.email || ''} required /></FormDialogItem>
+              <FormDialogItem><TextField select name="role" label="Role" fullWidth defaultValue={editingUser?.role || ''} required>{availableRoles.map((role) => <MenuItem key={role} value={role}>{role}</MenuItem>)}</TextField></FormDialogItem>
+            </FormDialogGrid>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={formDialogActionsSx}>
             <Button onClick={handleClose}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary">
               Save

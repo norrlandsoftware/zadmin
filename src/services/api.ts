@@ -283,6 +283,10 @@ export const workflows = {
     const response = await api.post(`/olt/${oltId}/workflow/initialization/start`);
     return response.data;
   },
+  getOltInstances: async (oltId: string) => {
+    const response = await api.get(`/olt/${oltId}/workflow_instances`);
+    return response.data;
+  },
   getInstance: async (instanceId: string) => {
     const response = await api.get(`/workflow_instance/${instanceId}`);
     return response.data;

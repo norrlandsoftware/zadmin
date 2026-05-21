@@ -17,6 +17,7 @@ import {
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import { FormDialogGrid, FormDialogItem, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import {
   bngModels,
   oltLineCardModels,
@@ -381,25 +382,26 @@ const DeviceModels: React.FC = () => {
 
   const renderField = (field: DeviceModelField, index: number) => {
     const defaultValue = editingModel?.[field.name];
+    const fullWidth = field.type === 'textarea' || field.type === 'olt-model-multi-select';
 
     if (field.type === 'boolean') {
       return (
-        <TextField
-          key={field.name}
-          select
-          margin="dense"
-          name={field.name}
-          label={field.label}
-          fullWidth
-          defaultValue={
-            defaultValue === true ? 'true' : defaultValue === false ? 'false' : ''
-          }
-          required={field.required}
-        >
-          <MenuItem value="">N/A</MenuItem>
-          <MenuItem value="true">Yes</MenuItem>
-          <MenuItem value="false">No</MenuItem>
-        </TextField>
+        <FormDialogItem key={field.name} fullWidth={fullWidth}>
+          <TextField
+            select
+            name={field.name}
+            label={field.label}
+            fullWidth
+            defaultValue={
+              defaultValue === true ? 'true' : defaultValue === false ? 'false' : ''
+            }
+            required={field.required}
+          >
+            <MenuItem value="">N/A</MenuItem>
+            <MenuItem value="true">Yes</MenuItem>
+            <MenuItem value="false">No</MenuItem>
+          </TextField>
+        </FormDialogItem>
       );
     }
 
@@ -407,45 +409,45 @@ const DeviceModels: React.FC = () => {
       const selectedValues = Array.isArray(defaultValue) ? defaultValue : [];
 
       return (
-        <TextField
-          key={field.name}
-          select
-          margin="dense"
-          name={field.name}
-          label={field.label}
-          fullWidth
-          defaultValue={selectedValues}
-          SelectProps={{
-            multiple: true,
-            renderValue: (selected) =>
-              formatOltModelIds(Array.isArray(selected) ? selected : []),
-          }}
-          helperText="Leave empty to allow all OLT models."
-        >
-          {(oltModelsData?.data || []).map((model: any) => (
-            <MenuItem key={model.id} value={model.id}>
-              <ListItemText primary={model.name} secondary={model.vendor} />
-            </MenuItem>
-          ))}
-        </TextField>
+        <FormDialogItem key={field.name} fullWidth={fullWidth}>
+          <TextField
+            select
+            name={field.name}
+            label={field.label}
+            fullWidth
+            defaultValue={selectedValues}
+            SelectProps={{
+              multiple: true,
+              renderValue: (selected) =>
+                formatOltModelIds(Array.isArray(selected) ? selected : []),
+            }}
+            helperText="Leave empty to allow all OLT models."
+          >
+            {(oltModelsData?.data || []).map((model: any) => (
+              <MenuItem key={model.id} value={model.id}>
+                <ListItemText primary={model.name} secondary={model.vendor} />
+              </MenuItem>
+            ))}
+          </TextField>
+        </FormDialogItem>
       );
     }
 
     return (
-      <TextField
-        key={field.name}
-        autoFocus={index === 0}
-        margin="dense"
-        name={field.name}
-        label={field.label}
-        type={field.type === 'number' ? 'number' : 'text'}
-        fullWidth
-        multiline={field.type === 'textarea'}
-        rows={field.type === 'textarea' ? 3 : undefined}
-        defaultValue={defaultValue ?? ''}
-        required={field.required}
-        inputProps={field.type === 'number' ? { min: 0, step: 1 } : undefined}
-      />
+      <FormDialogItem key={field.name} fullWidth={fullWidth}>
+        <TextField
+          autoFocus={index === 0}
+          name={field.name}
+          label={field.label}
+          type={field.type === 'number' ? 'number' : 'text'}
+          fullWidth
+          multiline={field.type === 'textarea'}
+          rows={field.type === 'textarea' ? 3 : undefined}
+          defaultValue={defaultValue ?? ''}
+          required={field.required}
+          inputProps={field.type === 'number' ? { min: 0, step: 1 } : undefined}
+        />
+      </FormDialogItem>
     );
   };
 
@@ -483,20 +485,22 @@ const DeviceModels: React.FC = () => {
         onEdit={config.allowEdit === false ? undefined : handleEdit}
       />
 
-      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="sm" fullWidth>
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
         <form onSubmit={handleSave}>
-          <DialogTitle>
+          <DialogTitle sx={formDialogTitleSx}>
             {editingModel ? `Edit ${config.singular}` : `Create New ${config.singular}`}
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={formDialogContentSx}>
             {formError && (
               <Alert severity="error" sx={{ mb: 2, mt: 1 }}>
                 {formError}
               </Alert>
             )}
-            {config.fields.map(renderField)}
+            <FormDialogGrid>
+              {config.fields.map(renderField)}
+            </FormDialogGrid>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={formDialogActionsSx}>
             <Button onClick={handleClose}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary">
               Save

@@ -14,6 +14,7 @@ import {
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import { FormDialogGrid, FormDialogItem, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import { configTemplates } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
@@ -152,57 +153,24 @@ const ConfigTemplates: React.FC = () => {
         onEdit={handleEdit}
       />
 
-      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth>
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
         <form onSubmit={handleSave}>
-          <DialogTitle>
+          <DialogTitle sx={formDialogTitleSx}>
             {editingTemplate ? 'Edit Config Template' : 'Create New Config Template'}
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={formDialogContentSx}>
             {formError && (
               <Alert severity="error" sx={{ mb: 2, mt: 1 }}>
                 {formError}
               </Alert>
             )}
-            <TextField
-              autoFocus
-              margin="dense"
-              name="name"
-              label="Name"
-              type="text"
-              fullWidth
-              defaultValue={editingTemplate?.name || ''}
-              required
-            />
-            <TextField
-              margin="dense"
-              name="description"
-              label="Description"
-              type="text"
-              fullWidth
-              defaultValue={editingTemplate?.description || ''}
-            />
-            <TextField
-              margin="dense"
-              name="body_preview"
-              label="Template"
-              type="text"
-              fullWidth
-              multiline
-              rows={10}
-              value={templateBody}
-              onChange={(event) => setTemplateBody(event.target.value)}
-              InputProps={{
-                sx: {
-                  fontFamily:
-                    'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                  fontSize: '0.8125rem',
-                  lineHeight: 1.45,
-                  whiteSpace: 'pre-wrap',
-                },
-              }}
-            />
+            <FormDialogGrid>
+              <FormDialogItem><TextField autoFocus name="name" label="Name" type="text" fullWidth defaultValue={editingTemplate?.name || ''} required /></FormDialogItem>
+              <FormDialogItem><TextField name="description" label="Description" type="text" fullWidth defaultValue={editingTemplate?.description || ''} /></FormDialogItem>
+              <FormDialogItem fullWidth><TextField name="body_preview" label="Template" type="text" fullWidth multiline rows={10} value={templateBody} onChange={(event) => setTemplateBody(event.target.value)} InputProps={{ sx: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace', fontSize: '0.8125rem', lineHeight: 1.45, whiteSpace: 'pre-wrap' } }} /></FormDialogItem>
+            </FormDialogGrid>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={formDialogActionsSx}>
             <Button onClick={handleClose}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary">
               Save

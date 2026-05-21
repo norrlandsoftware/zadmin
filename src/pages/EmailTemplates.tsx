@@ -17,6 +17,7 @@ import {
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import { FormDialogGrid, FormDialogItem, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import { emailTemplates } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
@@ -129,79 +130,27 @@ const EmailTemplates: React.FC = () => {
         onEdit={handleEdit}
       />
 
-      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth>
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
         <form onSubmit={handleSave}>
-          <DialogTitle>
+          <DialogTitle sx={formDialogTitleSx}>
             {editingTemplate ? 'Edit Email Template' : 'Create New Email Template'}
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={formDialogContentSx}>
             {formError && (
               <Alert severity="error" sx={{ mb: 2, mt: 1 }}>
                 {formError}
               </Alert>
             )}
-            <TextField
-              autoFocus
-              margin="dense"
-              name="name"
-              label="Name"
-              type="text"
-              fullWidth
-              defaultValue={editingTemplate?.name || ''}
-              required
-            />
-            <TextField
-              select
-              margin="dense"
-              name="type"
-              label="Type"
-              fullWidth
-              defaultValue={editingTemplate?.type || 'generic'}
-              required
-            >
-              {templateTypes.map((type) => (
-                <MenuItem key={type} value={type}>
-                  {type}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              margin="dense"
-              name="description"
-              label="Description"
-              type="text"
-              fullWidth
-              defaultValue={editingTemplate?.description || ''}
-            />
-            <TextField
-              margin="dense"
-              name="subject"
-              label="Subject"
-              type="text"
-              fullWidth
-              defaultValue={editingTemplate?.subject || ''}
-            />
-            <TextField
-              margin="dense"
-              name="body"
-              label="Body"
-              multiline
-              minRows={10}
-              fullWidth
-              defaultValue={editingTemplate?.body || ''}
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  name="is_active"
-                  defaultChecked={editingTemplate?.is_active ?? true}
-                />
-              }
-              label="Active"
-              sx={{ mt: 1 }}
-            />
+            <FormDialogGrid>
+              <FormDialogItem><TextField autoFocus name="name" label="Name" type="text" fullWidth defaultValue={editingTemplate?.name || ''} required /></FormDialogItem>
+              <FormDialogItem><TextField select name="type" label="Type" fullWidth defaultValue={editingTemplate?.type || 'generic'} required>{templateTypes.map((type) => <MenuItem key={type} value={type}>{type}</MenuItem>)}</TextField></FormDialogItem>
+              <FormDialogItem><TextField name="description" label="Description" type="text" fullWidth defaultValue={editingTemplate?.description || ''} /></FormDialogItem>
+              <FormDialogItem><TextField name="subject" label="Subject" type="text" fullWidth defaultValue={editingTemplate?.subject || ''} /></FormDialogItem>
+              <FormDialogItem fullWidth><TextField name="body" label="Body" multiline minRows={10} fullWidth defaultValue={editingTemplate?.body || ''} /></FormDialogItem>
+              <FormDialogItem><FormControlLabel control={<Checkbox name="is_active" defaultChecked={editingTemplate?.is_active ?? true} />} label="Active" sx={{ mt: 0.5 }} /></FormDialogItem>
+            </FormDialogGrid>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={formDialogActionsSx}>
             <Button onClick={handleClose}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary">
               Save

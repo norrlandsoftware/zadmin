@@ -14,11 +14,11 @@ import {
   InputAdornment,
   MenuItem,
   TextField,
-  Typography,
 } from '@mui/material';
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import { FormDialogGrid, FormDialogItem, FormDialogSectionTitle, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import { pops, switches, switchModels } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
@@ -188,12 +188,12 @@ const Switches: React.FC = () => {
         onEdit={handleEdit}
       />
 
-      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="sm" fullWidth>
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
         <form onSubmit={handleSave} autoComplete="off">
-          <DialogTitle>
+          <DialogTitle sx={formDialogTitleSx}>
             {editingSwitch ? 'Edit Switch' : 'Create New Switch'}
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={formDialogContentSx}>
             <Box sx={{ display: 'none' }} aria-hidden="true">
               <input type="text" name="fake_username" autoComplete="username" tabIndex={-1} />
               <input type="password" name="fake_password" autoComplete="current-password" tabIndex={-1} />
@@ -203,142 +203,23 @@ const Switches: React.FC = () => {
                 {formError}
               </Alert>
             )}
-            <TextField
-              autoFocus
-              margin="dense"
-              name="name"
-              label="Name"
-              type="text"
-              fullWidth
-              defaultValue={editingSwitch?.name || ''}
-              required
-            />
-            <TextField
-              select
-              margin="dense"
-              name="type"
-              label="Type"
-              fullWidth
-              defaultValue={editingSwitch?.type || 'ACCESS'}
-              required
-            >
-              {switchTypes.map((type) => (
-                <MenuItem key={type} value={type}>
-                  {type}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              margin="dense"
-              name="model_id"
-              label="Model"
-              fullWidth
-              defaultValue={editingSwitch?.model_id || ''}
-            >
-              <MenuItem value="">N/A</MenuItem>
-              {switchModelsData?.data.map((model: any) => (
-                <MenuItem key={model.id} value={model.id}>
-                  {model.name}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              select
-              margin="dense"
-              name="pop_id"
-              label="POP"
-              fullWidth
-              defaultValue={editingSwitch?.pop_id || ''}
-            >
-              <MenuItem value="">N/A</MenuItem>
-              {popsData?.data.map((pop: any) => (
-                <MenuItem key={pop.id} value={pop.id}>
-                  {pop.name}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              margin="dense"
-              name="ip_address_v4"
-              label="IP Address"
-              type="text"
-              fullWidth
-              defaultValue={editingSwitch?.ip_address_v4 || ''}
-            />
-            <Box sx={{ mt: 2, mb: 1 }}>
-              <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                Credentials
-              </Typography>
-              <TextField
-                margin="dense"
-                name="username"
-                label="Username"
-                type={showUsername ? 'text' : 'password'}
-                fullWidth
-                defaultValue={editingSwitch?.username || ''}
-                autoComplete="off"
-                inputProps={{
-                  autoComplete: 'off',
-                  'data-lpignore': 'true',
-                  'data-form-type': 'other',
-                }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label={showUsername ? 'Hide username' : 'Show username'}
-                        onClick={() => setShowUsername((prev) => !prev)}
-                        onMouseDown={(event) => event.preventDefault()}
-                        edge="end"
-                      >
-                        {showUsername ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-              <TextField
-                margin="dense"
-                name="password"
-                label="Password"
-                type={showPassword ? 'text' : 'password'}
-                fullWidth
-                defaultValue={editingSwitch?.password || ''}
-                autoComplete="new-password"
-                inputProps={{
-                  autoComplete: 'new-password',
-                  'data-lpignore': 'true',
-                  'data-form-type': 'other',
-                }}
-                InputProps={{
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        aria-label={showPassword ? 'Hide password' : 'Show password'}
-                        onClick={() => setShowPassword((prev) => !prev)}
-                        onMouseDown={(event) => event.preventDefault()}
-                        edge="end"
-                      >
-                        {showPassword ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            </Box>
-            <TextField
-              margin="dense"
-              name="description"
-              label="Description"
-              type="text"
-              fullWidth
-              multiline
-              rows={3}
-              defaultValue={editingSwitch?.description || ''}
-            />
+            <FormDialogGrid>
+              <FormDialogItem><TextField autoFocus name="name" label="Name" type="text" fullWidth defaultValue={editingSwitch?.name || ''} required /></FormDialogItem>
+              <FormDialogItem><TextField select name="type" label="Type" fullWidth defaultValue={editingSwitch?.type || 'ACCESS'} required>{switchTypes.map((type) => <MenuItem key={type} value={type}>{type}</MenuItem>)}</TextField></FormDialogItem>
+              <FormDialogItem><TextField select name="model_id" label="Model" fullWidth defaultValue={editingSwitch?.model_id || ''}><MenuItem value="">N/A</MenuItem>{switchModelsData?.data.map((model: any) => <MenuItem key={model.id} value={model.id}>{model.name}</MenuItem>)}</TextField></FormDialogItem>
+              <FormDialogItem><TextField select name="pop_id" label="POP" fullWidth defaultValue={editingSwitch?.pop_id || ''}><MenuItem value="">N/A</MenuItem>{popsData?.data.map((pop: any) => <MenuItem key={pop.id} value={pop.id}>{pop.name}</MenuItem>)}</TextField></FormDialogItem>
+              <FormDialogItem><TextField name="ip_address_v4" label="IP Address" type="text" fullWidth defaultValue={editingSwitch?.ip_address_v4 || ''} /></FormDialogItem>
+              <FormDialogItem fullWidth>
+                <FormDialogSectionTitle>Credentials</FormDialogSectionTitle>
+                <FormDialogGrid>
+                  <FormDialogItem><TextField name="username" label="Username" type={showUsername ? 'text' : 'password'} fullWidth defaultValue={editingSwitch?.username || ''} autoComplete="off" inputProps={{ autoComplete: 'off', 'data-lpignore': 'true', 'data-form-type': 'other' }} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton aria-label={showUsername ? 'Hide username' : 'Show username'} onClick={() => setShowUsername((prev) => !prev)} onMouseDown={(event) => event.preventDefault()} edge="end">{showUsername ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}</IconButton></InputAdornment> }} /></FormDialogItem>
+                  <FormDialogItem><TextField name="password" label="Password" type={showPassword ? 'text' : 'password'} fullWidth defaultValue={editingSwitch?.password || ''} autoComplete="new-password" inputProps={{ autoComplete: 'new-password', 'data-lpignore': 'true', 'data-form-type': 'other' }} InputProps={{ endAdornment: <InputAdornment position="end"><IconButton aria-label={showPassword ? 'Hide password' : 'Show password'} onClick={() => setShowPassword((prev) => !prev)} onMouseDown={(event) => event.preventDefault()} edge="end">{showPassword ? <MaterialSymbol name="visibility_off" /> : <MaterialSymbol name="visibility" />}</IconButton></InputAdornment> }} /></FormDialogItem>
+                </FormDialogGrid>
+              </FormDialogItem>
+              <FormDialogItem fullWidth><TextField name="description" label="Description" type="text" fullWidth multiline rows={3} defaultValue={editingSwitch?.description || ''} /></FormDialogItem>
+            </FormDialogGrid>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={formDialogActionsSx}>
             <Button onClick={handleClose}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary">
               Save
