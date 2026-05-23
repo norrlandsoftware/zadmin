@@ -167,9 +167,15 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
                   spacing={1}
                 >
                   <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: '0.98rem', lineHeight: 1.3 }}>
-                      {action.sequence}. {action.description}
-                    </Typography>
+                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ minWidth: 0 }}>
+                      <MaterialSymbol
+                        name={action.manual_task ? 'person' : 'settings'}
+                        fontSize="small"
+                      />
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: '0.98rem', lineHeight: 1.3 }}>
+                        {action.sequence}. {action.description}
+                      </Typography>
+                    </Stack>
                   </Box>
 
                 <Stack
