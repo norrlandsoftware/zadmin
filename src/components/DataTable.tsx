@@ -34,6 +34,7 @@ interface DataTableProps {
   onTroubleshoot?: (row: any) => void;
   onConfigure?: (row: any) => void;
   onDocument?: (row: any) => void;
+  onTransfer?: (row: any) => void;
   isConfigureDisabled?: (row: any) => boolean;
 }
 
@@ -52,11 +53,22 @@ const DataTable: React.FC<DataTableProps> = ({
   onTroubleshoot,
   onConfigure,
   onDocument,
+  onTransfer,
   isConfigureDisabled,
 }) => {
-  const hasActions = Boolean(onView || onEdit || onDelete || onTroubleshoot || onConfigure || onDocument);
+  const hasActions = Boolean(
+    onView || onEdit || onDelete || onTroubleshoot || onConfigure || onDocument || onTransfer
+  );
   const showViewAction = Boolean(onView) && !onRowClick;
-  const actionCount = [showViewAction, onTroubleshoot, onConfigure, onDocument, onEdit, onDelete].filter(Boolean).length;
+  const actionCount = [
+    showViewAction,
+    onTroubleshoot,
+    onConfigure,
+    onDocument,
+    onTransfer,
+    onEdit,
+    onDelete,
+  ].filter(Boolean).length;
   const actionsColumnWidth = hasActions ? Math.max(112, actionCount * 32) : 0;
   const dataColumnWidth = hasActions
     ? `calc((100% - ${actionsColumnWidth}px) / ${columns.length})`
@@ -199,6 +211,18 @@ const DataTable: React.FC<DataTableProps> = ({
                           sx={{ p: 0.5 }}
                         >
                           <MaterialSymbol name="description" />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {onTransfer && (
+                      <Tooltip title="TFTP File Transfer">
+                        <IconButton
+                          size="small"
+                          onClick={() => onTransfer(row)}
+                          color="primary"
+                          sx={{ p: 0.5 }}
+                        >
+                          <MaterialSymbol name="send" />
                         </IconButton>
                       </Tooltip>
                     )}

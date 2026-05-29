@@ -12,7 +12,7 @@ import Dashboard from './pages/Dashboard.tsx';
 import Pops from './pages/Pops.tsx';
 import Bngs from './pages/Bngs.tsx';
 import Olts from './pages/Olts.tsx';
-import OltSettings from './pages/OltConfiguration.tsx';
+import OltSettings from './pages/OltSettings.tsx';
 import OltRenderedConfigurations from './pages/OltRenderedConfigurations.tsx';
 import OltRenderedConfigurationDetails from './pages/OltRenderedConfigurationDetails.tsx';
 import OltInitializationWorkflow from './pages/OltInitializationWorkflow.tsx';
@@ -22,6 +22,7 @@ import Users from './pages/Users.tsx';
 import Settings from './pages/Settings.tsx';
 import EmailTemplates from './pages/EmailTemplates.tsx';
 import ConfigTemplates from './pages/ConfigTemplates.tsx';
+import OntFiles from './pages/OntFiles.tsx';
 import ResetPassword from './pages/ResetPassword.tsx';
 import About from './pages/About.tsx';
 import DeviceModels from './pages/DeviceModels.tsx';
@@ -168,6 +169,14 @@ const App: React.FC = () => {
                 element={
                   <PrivateRoute>
                     <ConfigTemplates />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/ont-files/*"
+                element={
+                  <PrivateRoute>
+                    <OntFiles />
                   </PrivateRoute>
                 }
               />

@@ -69,6 +69,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
     { text: 'About', icon: <MaterialSymbol name="info" />, path: '/about' },
     { text: 'Email Templates', icon: <MaterialSymbol name="email" />, path: '/email-templates' },
     { text: 'Config Templates', icon: <MaterialSymbol name="dashboard_2_gear" />, path: '/config-templates' },
+    { text: 'ONT Files', icon: <MaterialSymbol name="folder_managed" />, path: '/ont-files' },
     { text: 'Settings', icon: <MaterialSymbol name="settings" />, path: '/settings' },
     { text: 'Users', icon: <MaterialSymbol name="people" />, path: '/users' },
   ];

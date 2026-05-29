@@ -77,7 +77,7 @@ const Olts: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [testingOlt, setTestingOlt] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  const [selectedModelId, setSelectedModelId] = useState('');
+  const [selectedModelCode, setSelectedModelCode] = useState('');
   const [isNavigatingToSettings, setIsNavigatingToSettings] = useState(false);
   const [startingWorkflowId, setStartingWorkflowId] = useState<string | null>(null);
   const [viewingOltId, setViewingOltId] = useState<string | null>(null);
@@ -151,29 +151,33 @@ const Olts: React.FC = () => {
     [oltModelsData]
   );
 
+  const modelNameByCode = useMemo(
+    () => new Map((oltModelsData?.data || []).map((model: any) => [model.code, model.name])),
+    [oltModelsData]
+  );
+
   const columns = useMemo(
     () => [
       { id: 'name', label: 'Name' },
-      {
-        id: 'model_id',
-        label: 'Model',
-        format: (value: string) => formatOptional(modelNameById.get(value) || value),
-      },
+      { id: 'model_name', label: 'Model', format: formatOptional },
       { id: 'area', label: 'Area', format: formatOptional },
       { id: 'ip_address_v4', label: 'IP Address', format: formatOptional },
       { id: 'sntp_ip_address', label: 'SNTP IP', format: formatOptional },
       { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
     ],
-    [modelNameById]
+    []
   );
 
   const decorateOlt = useCallback(
     (olt: any) => ({
       ...olt,
-      model_name: modelNameById.get(olt.model_id) || 'N/A',
+      model_name:
+        modelNameByCode.get(olt.model_code) ||
+        modelNameById.get(olt.model_id) ||
+        'N/A',
       pop_name: popNameById.get(olt.pop_id) || 'N/A',
     }),
-    [modelNameById, popNameById]
+    [modelNameByCode, modelNameById, popNameById]
   );
 
   useEffect(() => {
@@ -190,7 +194,6 @@ const Olts: React.FC = () => {
 
     const oltWithNames = decorateOlt(matchedOlt);
 
-    delete oltWithNames.model_id;
     delete oltWithNames.pop_id;
 
     setViewingOltId(matchedOlt.id);
@@ -202,7 +205,6 @@ const Olts: React.FC = () => {
   const handleView = (olt: any) => {
     const oltWithNames = decorateOlt(olt);
 
-    delete oltWithNames.model_id;
     delete oltWithNames.pop_id;
 
     setViewingOltId(olt.id);
@@ -212,7 +214,7 @@ const Olts: React.FC = () => {
 
   const handleEdit = (olt: any) => {
     setEditingOlt(olt);
-    setSelectedModelId(olt.model_id || '');
+    setSelectedModelCode(olt.model_code || '');
     setFormError(null);
     setDialogOpen(true);
   };
@@ -261,7 +263,7 @@ const Olts: React.FC = () => {
     setDialogOpen(false);
     setEditingOlt(null);
     setFormError(null);
-    setSelectedModelId('');
+    setSelectedModelCode('');
     setShowUsername(false);
     setShowPassword(false);
   };
@@ -281,7 +283,6 @@ const Olts: React.FC = () => {
     }
 
     const merged = decorateOlt(viewingOltDetails);
-    delete merged.model_id;
     delete merged.pop_id;
     return merged;
   }, [decorateOlt, viewingOlt, viewingOltDetails]);
@@ -295,6 +296,11 @@ const Olts: React.FC = () => {
     [viewingWorkflowInstances]
   );
 
+  const tableData = useMemo(
+    () => (data?.data || []).map((olt: any) => decorateOlt(olt)),
+    [data, decorateOlt]
+  );
+
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
     setFormError(null);
@@ -302,7 +308,7 @@ const Olts: React.FC = () => {
     const payload = {
       name: formData.get('name'),
       description: nullableString(formData.get('description')),
-      model_id: nullableString(formData.get('model_id')),
+      model_code: nullableString(formData.get('model_code')),
       software_version: nullableString(formData.get('software_version')),
       logging_type: nullableString(formData.get('logging_type')) || 'syslog',
       ip_address_v4: nullableString(formData.get('ip_address_v4')),
@@ -407,7 +413,7 @@ const Olts: React.FC = () => {
             onClick={() => {
               setEditingOlt(null);
               setFormError(null);
-              setSelectedModelId('');
+              setSelectedModelCode('');
               setDialogOpen(true);
             }}
           >
@@ -418,7 +424,7 @@ const Olts: React.FC = () => {
 
       <DataTable
         columns={columns}
-        data={data?.data || []}
+        data={tableData}
         total={data?.pagination.total || 0}
         page={page}
         rowsPerPage={rowsPerPage}
@@ -427,7 +433,7 @@ const Olts: React.FC = () => {
         onRowClick={handleView}
         onConfigure={handleConfigure}
         onDocument={handleViewRenderedConfigurations}
-        isConfigureDisabled={(olt: any) => !olt.model_id}
+        isConfigureDisabled={(olt: any) => !olt.model_code}
         onEdit={handleEdit}
       />
 
@@ -453,15 +459,15 @@ const Olts: React.FC = () => {
               <FormDialogItem>
                 <TextField
                   select
-                  name="model_id"
+                  name="model_code"
                   label="Model"
                   fullWidth
-                  value={selectedModelId}
-                  onChange={(event) => setSelectedModelId(event.target.value)}
+                  value={selectedModelCode}
+                  onChange={(event) => setSelectedModelCode(event.target.value)}
                   required
                 >
                   {oltModelsData?.data.map((model: any) => (
-                    <MenuItem key={model.id} value={model.id}>
+                    <MenuItem key={model.code} value={model.code}>
                       {model.name}
                     </MenuItem>
                   ))}

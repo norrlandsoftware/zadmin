@@ -84,8 +84,9 @@ const deviceModelConfigs: Record<string, DeviceModelConfig> = {
       { name: 'number_of_pon_ports', label: 'PON Ports', type: 'number' },
       { name: 'number_of_xgspon_ports', label: 'XGSPON Ports', type: 'number' },
       { name: 'number_of_uplink_ports', label: 'Uplink Ports', type: 'number' },
-      { name: 'number_of_pon_slots', label: 'PON Slots', type: 'number' },
-      { name: 'number_of_uplink_slots', label: 'Uplink Slots', type: 'number' },
+      { name: 'number_of_line_card_slots', label: 'Line Card Slots', type: 'number' },
+      { name: 'number_of_uplink_card_slots', label: 'Uplink Card Slots', type: 'number' },
+      { name: 'uplink_line_card_slots_name', label: 'Uplink Slot Names', type: 'text' },
       { name: 'description', label: 'Description', type: 'textarea' },
     ],
     columns: [
@@ -93,7 +94,8 @@ const deviceModelConfigs: Record<string, DeviceModelConfig> = {
       { id: 'vendor', label: 'Vendor' },
       { id: 'modular', label: 'Modular', format: formatBoolean },
       { id: 'number_of_pon_ports', label: 'PON Ports', format: formatOptional },
-      { id: 'number_of_pon_slots', label: 'PON Slots', format: formatOptional },
+      { id: 'number_of_line_card_slots', label: 'Line Card Slots', format: formatOptional },
+      { id: 'number_of_uplink_card_slots', label: 'Uplink Card Slots', format: formatOptional },
       { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
     ],
   },
@@ -127,12 +129,15 @@ const deviceModelConfigs: Record<string, DeviceModelConfig> = {
     api: oltUplinkCardModels,
     fields: [
       ...commonFields.slice(0, 2),
+      { name: 'number_of_uplink_port', label: 'Uplink Ports', type: 'number' },
+      { name: 'uplink_port_names', label: 'Uplink Port Names', type: 'text' },
       { name: 'olt_model_ids', label: 'Compatible OLT Models', type: 'olt-model-multi-select' },
       commonFields[2],
     ],
     columns: [
       { id: 'name', label: 'Name' },
       { id: 'vendor', label: 'Vendor' },
+      { id: 'number_of_uplink_port', label: 'Uplink Ports', format: formatOptional },
       { id: 'description', label: 'Description', format: formatOptional },
       { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
     ],
@@ -285,15 +290,21 @@ const DeviceModels: React.FC = () => {
       if ('number_of_pon_ports' in details) ports.pon_ports = details.number_of_pon_ports;
       if ('number_of_xgspon_ports' in details) ports.xgspon_ports = details.number_of_xgspon_ports;
       if ('number_of_uplink_ports' in details) ports.uplink_ports = details.number_of_uplink_ports;
-      if ('number_of_pon_slots' in details) slots.pon_slots = details.number_of_pon_slots;
-      if ('number_of_uplink_slots' in details) slots.uplink_slots = details.number_of_uplink_slots;
+      if ('number_of_line_card_slots' in details) slots.line_card_slots = details.number_of_line_card_slots;
+      if ('number_of_uplink_card_slots' in details) slots.uplink_card_slots = details.number_of_uplink_card_slots;
+      if ('uplink_line_card_slots_name' in details) {
+        slots.uplink_slot_names = Array.isArray(details.uplink_line_card_slots_name)
+          ? details.uplink_line_card_slots_name.join(', ')
+          : details.uplink_line_card_slots_name;
+      }
 
       delete details.compatible_olt_models;
       delete details.number_of_pon_ports;
       delete details.number_of_xgspon_ports;
       delete details.number_of_uplink_ports;
-      delete details.number_of_pon_slots;
-      delete details.number_of_uplink_slots;
+      delete details.number_of_line_card_slots;
+      delete details.number_of_uplink_card_slots;
+      delete details.uplink_line_card_slots_name;
 
       details.ports = ports;
       details.slots = slots;
@@ -312,6 +323,10 @@ const DeviceModels: React.FC = () => {
           : ['All OLT models supported'];
 
       details.supported_olt_model_codes = supportedCodes.join(', ');
+    }
+
+    if (modelType === 'olt-uplink-card' && Array.isArray(details.uplink_port_names)) {
+      details.uplink_port_names = details.uplink_port_names.join(', ');
     }
 
     if (modelType === 'olt-line-card' || modelType === 'olt-uplink-card' || modelType === 'bng') {
