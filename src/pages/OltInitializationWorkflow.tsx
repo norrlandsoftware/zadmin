@@ -6,6 +6,8 @@ import Layout from '../components/Layout.tsx';
 import WorkflowInstance from '../components/WorkflowInstance.tsx';
 import { oltRenderedConfigurations, olts, workflows } from '../services/api.ts';
 
+const TERMINAL_WORKFLOW_STATUSES = ['COMPLETED', 'FAILED'];
+
 const OltInitializationWorkflow: React.FC = () => {
   const { id = '', instanceId = '' } = useParams();
   const navigate = useNavigate();
@@ -16,7 +18,11 @@ const OltInitializationWorkflow: React.FC = () => {
   const { data: instance, isLoading, isError } = useQuery(
     ['workflow-instance', instanceId],
     () => workflows.getInstance(instanceId),
-    { enabled: Boolean(instanceId), refetchInterval: 3000 }
+    {
+      enabled: Boolean(instanceId),
+      refetchInterval: (currentData: any) =>
+        currentData?.status && TERMINAL_WORKFLOW_STATUSES.includes(currentData.status) ? false : 3000,
+    }
   );
 
   const { data: renderedConfigs } = useQuery(
@@ -87,6 +93,7 @@ const OltInitializationWorkflow: React.FC = () => {
           instance={instance}
           readOnly={instance?.status !== 'RUNNING'}
           renderedConfigByName={renderedConfigByName}
+          onViewTranscript={async (attemptId) => workflows.getActionTranscript(attemptId)}
           onManualAction={async (actionCode, success, note) => {
             await manualMutation.mutateAsync({ actionCode, success, note });
           }}

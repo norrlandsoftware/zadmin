@@ -7,6 +7,10 @@ import {
   Button,
   Chip,
   Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   LinearProgress,
   Paper,
@@ -21,6 +25,7 @@ interface WorkflowInstanceProps {
   renderedConfigByName?: Record<string, string>;
   onManualAction?: (actionCode: string, success: boolean, note?: string) => Promise<void>;
   onRetryAutomatic?: (actionCode: string) => Promise<void>;
+  onViewTranscript?: (attemptId: string) => Promise<any>;
 }
 
 const statusColor = (status: string) => {
@@ -104,10 +109,42 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
   renderedConfigByName = {},
   onManualAction,
   onRetryAutomatic,
+  onViewTranscript,
 }) => {
   const [noteByAction, setNoteByAction] = useState<Record<string, string>>({});
   const [expandedByAction, setExpandedByAction] = useState<Record<string, boolean>>({});
   const [configDialogData, setConfigDialogData] = useState<{ title: string; data: any } | null>(null);
+  const [transcriptDialogOpen, setTranscriptDialogOpen] = useState(false);
+  const [transcriptDialogTitle, setTranscriptDialogTitle] = useState('Attempt Transcript');
+  const [transcriptData, setTranscriptData] = useState<any>(null);
+  const [transcriptError, setTranscriptError] = useState<string | null>(null);
+  const [transcriptLoadingAttemptId, setTranscriptLoadingAttemptId] = useState<string | null>(null);
+
+  const handleOpenTranscript = async (action: any, attempt: any) => {
+    if (!attempt?.id || !onViewTranscript) {
+      return;
+    }
+
+    setTranscriptDialogTitle(`Transcript - ${action.description} - Attempt ${attempt.attempt}`);
+    setTranscriptDialogOpen(true);
+    setTranscriptData(null);
+    setTranscriptError(null);
+    setTranscriptLoadingAttemptId(attempt.id);
+
+    try {
+      const response = await onViewTranscript(attempt.id);
+      setTranscriptData(response);
+    } catch (error: any) {
+      setTranscriptError(
+        error?.response?.data?.detail?.[0]?.msg ||
+          error?.response?.data?.detail ||
+          error?.response?.data?.message ||
+          'Unable to load transcript.'
+      );
+    } finally {
+      setTranscriptLoadingAttemptId(null);
+    }
+  };
 
   const progress = useMemo(() => {
     const actions = instance?.actions || [];
@@ -330,7 +367,20 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
                                 <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.83rem' }}>
                                   Attempt {attempt.attempt}
                                 </Typography>
-                                <Chip size="small" label={attempt.status || 'N/A'} color={statusColor(attempt.status || '') as any} />
+                                <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="flex-end">
+                                  {attempt.has_transcript && onViewTranscript && (
+                                    <IconButton
+                                      size="small"
+                                      aria-label={`Load transcript for attempt ${attempt.attempt}`}
+                                      onClick={() => handleOpenTranscript(action, attempt)}
+                                      disabled={transcriptLoadingAttemptId === attempt.id}
+                                      sx={{ p: 0.25 }}
+                                    >
+                                      <MaterialSymbol name="build" fontSize="small" />
+                                    </IconButton>
+                                  )}
+                                  <Chip size="small" label={attempt.status || 'N/A'} color={statusColor(attempt.status || '') as any} />
+                                </Stack>
                               </Stack>
                               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, fontSize: '0.8rem' }}>
                                 {formatDateTime(attempt.started_at)} - {formatDateTime(attempt.finished_at)}
@@ -425,6 +475,112 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
         fullWidthFields={['configuration']}
         preformattedFields={['configuration']}
       />
+
+      <Dialog open={transcriptDialogOpen} onClose={() => setTranscriptDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>{transcriptDialogTitle}</DialogTitle>
+        <DialogContent dividers>
+          {transcriptLoadingAttemptId ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+              <LinearProgress sx={{ width: '100%', maxWidth: 320 }} />
+            </Box>
+          ) : transcriptError ? (
+            <Alert severity="error">{transcriptError}</Alert>
+          ) : transcriptData ? (
+            <Stack spacing={1.25}>
+              <Box sx={{ display: 'grid', gap: 1.25, gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' } }}>
+                <Box>
+                  <Typography variant="caption" color="primary.main" sx={{ fontWeight: 600, textTransform: 'uppercase' }}>
+                    Status
+                  </Typography>
+                  <Typography variant="body2">{transcriptData.attempt?.status || 'N/A'}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="primary.main" sx={{ fontWeight: 600, textTransform: 'uppercase' }}>
+                    Duration
+                  </Typography>
+                  <Typography variant="body2">
+                    {formatDuration(transcriptData.attempt?.started_at, transcriptData.attempt?.finished_at)}
+                  </Typography>
+                </Box>
+              </Box>
+
+              {Array.isArray(transcriptData.entries) && transcriptData.entries.length > 0 ? (
+                transcriptData.entries.map((entry: any) => (
+                  <Box key={entry.id || `${entry.sequence}-${entry.command}`} sx={{ p: 1, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+                    <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={0.75} sx={{ mb: 0.5 }}>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          Command Sequence {entry.sequence}
+                        </Typography>
+                        {entry.duration_ms != null && (
+                          <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+                            Duration: {entry.duration_ms} ms
+                          </Typography>
+                        )}
+                      </Stack>
+                      <Chip size="small" label={entry.status || 'N/A'} color={statusColor(entry.status || '') as any} />
+                    </Stack>
+                    {(entry.command || entry.response || entry.error_message) && (
+                      <Box sx={{ mt: 0.75, p: 0.6, borderRadius: 1, bgcolor: 'grey.100' }}>
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            fontFamily:
+                              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                            fontSize: '0.75rem',
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {[
+                            entry.command ? `Command:\n${entry.command}` : null,
+                            `Response:\n${entry.response ?? ''}`,
+                          ]
+                            .filter(Boolean)
+                            .join('\n\n')}
+                        </Typography>
+                      </Box>
+                    )}
+                    {entry.error_message && (
+                      <Box
+                        sx={{
+                          mt: 0.6,
+                          p: 0.6,
+                          borderRadius: 1,
+                          bgcolor: 'error.50',
+                          border: 1,
+                          borderColor: 'error.200',
+                        }}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            color: 'error.dark',
+                            fontFamily:
+                              'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                            fontSize: '0.75rem',
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {`Error:\n${entry.error_message}`}
+                        </Typography>
+                      </Box>
+                    )}
+                  </Box>
+                ))
+              ) : (
+                <Alert severity="info">No transcript entries available.</Alert>
+              )}
+            </Stack>
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setTranscriptDialogOpen(false)}>Close</Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };

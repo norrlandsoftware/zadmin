@@ -337,6 +337,10 @@ export const workflows = {
     const response = await api.get(`/workflow_instance/${instanceId}`);
     return response.data;
   },
+  getActionTranscript: async (attemptId: string) => {
+    const response = await api.get(`/workflow_instance_action/${attemptId}/transcript`);
+    return response.data;
+  },
   stopInstance: async (instanceId: string, reason?: string) => {
     const response = await api.post(`/workflow_instance/${instanceId}/stop`, { reason });
     return response.data;
