@@ -48,6 +48,13 @@ const getErrorMessage = (error: any) =>
   error?.response?.data?.message ||
   'Unable to save OLT.';
 
+const getReachabilityErrorMessage = (payload: any) =>
+  payload?.error ||
+  payload?.detail?.error ||
+  payload?.detail?.[0]?.msg ||
+  payload?.message ||
+  null;
+
 const getWorkflowInstances = (workflowInstancesResponse: any) => {
   if (!workflowInstancesResponse) {
     return [];
@@ -346,16 +353,25 @@ const Olts: React.FC = () => {
       const result = await olts.isReachable(viewingOlt.id);
       const reachable = Boolean(result.reachable);
       const oltName = viewingOlt.name || 'selected OLT';
+      const errorMessage = getReachabilityErrorMessage(result);
 
       pushResult(
         reachable ? 'success' : 'error',
         reachable
           ? `The OLT ${oltName} is reachable`
-          : `The OLT ${oltName} is NOT reachable`
+          : errorMessage
+            ? `The OLT ${oltName} is NOT reachable: ${errorMessage}`
+            : `The OLT ${oltName} is NOT reachable`
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error testing OLT reachability:', error);
-      pushResult('error', `Unable to test OLT ${viewingOlt.name || 'selected OLT'}`);
+      const errorMessage = getReachabilityErrorMessage(error?.response?.data);
+      pushResult(
+        'error',
+        errorMessage
+          ? `Unable to test OLT ${viewingOlt.name || 'selected OLT'}: ${errorMessage}`
+          : `Unable to test OLT ${viewingOlt.name || 'selected OLT'}`
+      );
     } finally {
       setTestingOlt(false);
     }

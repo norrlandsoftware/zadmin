@@ -211,6 +211,11 @@ const OltSettings: React.FC = () => {
     () => switches.getAll({ size: 1000, sort: 'name', q: 'type:DISTRIBUTION' }),
     { enabled: canLoadReferencedResources }
   );
+  const { data: oltsData, isLoading: isOltsLoading } = useQuery(
+    ['olts-settings-uplink-devices'],
+    () => olts.getAll({ size: 1000, sort: 'name' }),
+    { enabled: canLoadReferencedResources }
+  );
   const { data: bngsData, isLoading: isBngsLoading } = useQuery(
     ['bngs-settings'],
     () => bngs.getAll({ size: 1000, sort: 'name' }),
@@ -292,6 +297,38 @@ const OltSettings: React.FC = () => {
   const switchByName = useMemo(
     () => new Map((switchesData?.data || []).map((item: any) => [item.name, item])),
     [switchesData]
+  );
+  const oltById = useMemo(
+    () => new Map((oltsData?.data || []).map((item: any) => [String(item.id), item])),
+    [oltsData]
+  );
+
+  const oltByName = useMemo(
+    () => new Map((oltsData?.data || []).map((item: any) => [item.name, item])),
+    [oltsData]
+  );
+
+  const availableUplinkDevices = useMemo(
+    () => [
+      ...(switchesData?.data || []).map((item: any) => ({
+        id: String(item.id),
+        name: item.name || String(item.id),
+        type: 'switch',
+      })),
+      ...(oltsData?.data || [])
+        .filter((item: any) => String(item.id) !== String(id))
+        .map((item: any) => ({
+          id: String(item.id),
+          name: item.name || String(item.id),
+          type: 'olt',
+        })),
+    ],
+    [id, oltsData, switchesData]
+  );
+
+  const uplinkDeviceById = useMemo(
+    () => new Map(availableUplinkDevices.map((item: any) => [item.id, item])),
+    [availableUplinkDevices]
   );
   const bngModelById = useMemo(
     () => new Map((bngModelsData?.data || []).map((model: any) => [String(model.id), model])),
@@ -480,15 +517,19 @@ const OltSettings: React.FC = () => {
           uplinkCardModelByCode.get(source.olt_uplink_card_model_code || '')?.id ||
           source.olt_uplink_card_model_id ||
           '';
-        const configuredSwitchId = source.configuration?.uplink_device_id || '';
-        const configuredSwitch =
-          switchById.get(configuredSwitchId) ||
-          switchByName.get(source.configuration?.uplink_device_name || '');
+        const configuredDeviceId = source.configuration?.uplink_device_id || '';
+        const configuredDeviceType = String(source.configuration?.uplink_device_type || '').toLowerCase();
+        const configuredDeviceName = source.configuration?.uplink_device_name || source.configuration?.uplink_interface_name || '';
+        const configuredDevice =
+          (configuredDeviceType === 'olt'
+            ? oltById.get(String(configuredDeviceId)) || oltByName.get(configuredDeviceName)
+            : switchById.get(configuredDeviceId) || switchByName.get(configuredDeviceName)) ||
+          uplinkDeviceById.get(String(configuredDeviceId));
 
         return {
           ...slot,
           uplinkCardModelId: slot.uplinkCardModelId || resolvedModelId || '',
-          switchId: slot.switchId || configuredSwitchId || configuredSwitch?.id || '',
+          switchId: slot.switchId || configuredDeviceId || configuredDevice?.id || '',
           switchPort: slot.switchPort || source.configuration?.switch_port || '',
           ptpNetwork:
             slot.ptpNetwork ||
@@ -512,11 +553,14 @@ const OltSettings: React.FC = () => {
     );
   }, [
     lineCardModelByCode,
+    oltById,
+    oltByName,
     settingsElements,
     settingsPonBySlot,
     settingsUplinkBySlot,
     switchById,
     switchByName,
+    uplinkDeviceById,
     uplinkCardModelByCode,
   ]);
 
@@ -731,7 +775,7 @@ const OltSettings: React.FC = () => {
       uplinks: uplinkSlots
         .filter((slot) => slot.uplinkCardModelId)
         .map((slot) => {
-          const selectedSwitch = switchById.get(slot.switchId);
+          const selectedDevice = uplinkDeviceById.get(String(slot.switchId));
           const slotName = getUplinkSlotName(slot.slotNumber);
           return {
             name: slotName,
@@ -741,9 +785,9 @@ const OltSettings: React.FC = () => {
                 (model: any) => model.id === slot.uplinkCardModelId
               )?.code || '',
             configuration: {
-              uplink_device_type: 'switch',
+              uplink_device_type: selectedDevice?.type === 'switch' ? 'switch' : 'olt',
               uplink_device_id: slot.switchId || '',
-              uplink_interface_name: selectedSwitch?.name || '',
+              uplink_interface_name: selectedDevice?.name || '',
               ptp_network: slot.ptpNetwork,
               lag: slot.lag,
               uplink_port: slot.uplinkPorts.map((portName) => `${slotName}:${portName}`),
@@ -798,7 +842,7 @@ const OltSettings: React.FC = () => {
       ontFileById,
       ponSlots,
       softwareControlMatrixRows,
-      switchById,
+      uplinkDeviceById,
       uplinkCardModelsData,
       uplinkSlots,
     ]
@@ -933,10 +977,15 @@ const OltSettings: React.FC = () => {
           return slot;
         }
 
-        const configuredSwitchId = existingSlot.configuration?.uplink_device_id || '';
-        const configuredSwitch =
-          switchById.get(configuredSwitchId) ||
-          switchByName.get(existingSlot.configuration?.uplink_device_name || '');
+        const configuredDeviceId = existingSlot.configuration?.uplink_device_id || '';
+        const configuredDeviceType = String(existingSlot.configuration?.uplink_device_type || '').toLowerCase();
+        const configuredDeviceName =
+          existingSlot.configuration?.uplink_device_name || existingSlot.configuration?.uplink_interface_name || '';
+        const configuredDevice =
+          (configuredDeviceType === 'olt'
+            ? oltById.get(String(configuredDeviceId)) || oltByName.get(configuredDeviceName)
+            : switchById.get(configuredDeviceId) || switchByName.get(configuredDeviceName)) ||
+          uplinkDeviceById.get(String(configuredDeviceId));
 
         return {
           ...slot,
@@ -944,7 +993,7 @@ const OltSettings: React.FC = () => {
             uplinkCardModelByCode.get(existingSlot.olt_uplink_card_model_code || '')?.id ||
             existingSlot.olt_uplink_card_model_id ||
             '',
-          switchId: configuredSwitchId || configuredSwitch?.id || '',
+          switchId: configuredDeviceId || configuredDevice?.id || '',
           switchPort: existingSlot.configuration?.switch_port || '',
           ptpNetwork: existingSlot.configuration?.ptp_network || existingSlot.configuration?.ip_address || '',
           lag: Boolean(existingSlot.configuration?.lag),
@@ -986,6 +1035,8 @@ const OltSettings: React.FC = () => {
     lineCardModelByCode,
     lineCardModelsData,
     getUplinkSlotName,
+    oltById,
+    oltByName,
     oltModel?.number_of_line_card_slots,
     oltModel?.number_of_uplink_card_slots,
     uplinkSlotNames,
@@ -998,6 +1049,7 @@ const OltSettings: React.FC = () => {
     switchById,
     switchByName,
     switchesData,
+    uplinkDeviceById,
     uplinkCardModelByCode,
     uplinkCardModelsData,
     uplinkSlots.length,
@@ -1036,6 +1088,7 @@ const OltSettings: React.FC = () => {
     isLineCardModelsLoading ||
     isUplinkCardModelsLoading ||
     isSwitchesLoading ||
+    isOltsLoading ||
     isBngsLoading ||
     isBngModelsLoading ||
     isOntFilesLoading
@@ -1301,16 +1354,16 @@ const OltSettings: React.FC = () => {
                 sx={compactFieldSx}
                 value={slot.switchId}
                 onChange={(event) => {
-                  const selectedSwitchId = event.target.value;
+                  const selectedDeviceId = event.target.value;
                   updateUplinkSlot(slot.slotNumber, {
-                    switchId: selectedSwitchId,
+                    switchId: selectedDeviceId,
                   });
                 }}
               >
                 <MenuItem value="">N/A</MenuItem>
-                {switchesData?.data.map((item: any) => (
-                  <MenuItem key={item.id} value={item.id}>
-                    {item.name}
+                {availableUplinkDevices.map((item: any) => (
+                  <MenuItem key={`${item.type}-${item.id}`} value={item.id}>
+                    {item.name} ({item.type === 'switch' ? 'Switch' : 'OLT'})
                   </MenuItem>
                 ))}
               </TextField>
