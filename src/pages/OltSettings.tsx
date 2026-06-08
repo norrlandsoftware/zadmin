@@ -249,16 +249,21 @@ const OltSettings: React.FC = () => {
     [lineCardModelsData]
   );
   const currentOltModelCode = oltModel?.code || '';
+  const currentOltModelId = String(oltModel?.id || '');
   const compatibleLineCardModels = useMemo(
     () =>
       (lineCardModelsData?.data || []).filter((model: any) => {
         const supportedCodes = Array.isArray(model?.olt_model_codes) ? model.olt_model_codes : [];
+        const supportedIds = Array.isArray(model?.olt_model_ids) ? model.olt_model_ids.map((value: any) => String(value)) : [];
         if (supportedCodes.length === 0 && supportedIds.length === 0) {
           return true;
         }
-        return currentOltModelCode !== '' && supportedCodes.includes(currentOltModelCode);
+        return (
+          (currentOltModelCode !== '' && supportedCodes.includes(currentOltModelCode)) ||
+          (currentOltModelId !== '' && supportedIds.includes(currentOltModelId))
+        );
       }),
-    [currentOltModelCode, lineCardModelsData]
+    [currentOltModelCode, currentOltModelId, lineCardModelsData]
   );
 
   const uplinkCardModelByCode = useMemo(
@@ -281,12 +286,16 @@ const OltSettings: React.FC = () => {
     () =>
       (uplinkCardModelsData?.data || []).filter((model: any) => {
         const supportedCodes = Array.isArray(model?.olt_model_codes) ? model.olt_model_codes : [];
+        const supportedIds = Array.isArray(model?.olt_model_ids) ? model.olt_model_ids.map((value: any) => String(value)) : [];
         if (supportedCodes.length === 0 && supportedIds.length === 0) {
           return true;
         }
-        return currentOltModelCode !== '' && supportedCodes.includes(currentOltModelCode);
+        return (
+          (currentOltModelCode !== '' && supportedCodes.includes(currentOltModelCode)) ||
+          (currentOltModelId !== '' && supportedIds.includes(currentOltModelId))
+        );
       }),
-    [currentOltModelCode, uplinkCardModelsData]
+    [currentOltModelCode, currentOltModelId, uplinkCardModelsData]
   );
 
   const switchById = useMemo(

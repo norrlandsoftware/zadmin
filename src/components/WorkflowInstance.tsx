@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import MaterialSymbol from './MaterialSymbol.tsx';
 import DetailDialog from './DetailDialog.tsx';
 import {
@@ -7,6 +7,7 @@ import {
   Button,
   Chip,
   Collapse,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
@@ -116,34 +117,84 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
   const [configDialogData, setConfigDialogData] = useState<{ title: string; data: any } | null>(null);
   const [transcriptDialogOpen, setTranscriptDialogOpen] = useState(false);
   const [transcriptDialogTitle, setTranscriptDialogTitle] = useState('Attempt Transcript');
+  const [transcriptAttemptId, setTranscriptAttemptId] = useState<string | null>(null);
   const [transcriptData, setTranscriptData] = useState<any>(null);
   const [transcriptError, setTranscriptError] = useState<string | null>(null);
   const [transcriptLoadingAttemptId, setTranscriptLoadingAttemptId] = useState<string | null>(null);
 
+  const loadTranscript = useCallback(
+    async (attemptId: string, options?: { keepExistingData?: boolean }) => {
+      if (!attemptId || !onViewTranscript) {
+        return;
+      }
+
+      if (!options?.keepExistingData) {
+        setTranscriptData(null);
+      }
+      setTranscriptError(null);
+      setTranscriptLoadingAttemptId(attemptId);
+
+      try {
+        const response = await onViewTranscript(attemptId);
+        setTranscriptData(response);
+      } catch (error: any) {
+        setTranscriptError(
+          error?.response?.data?.detail?.[0]?.msg ||
+            error?.response?.data?.detail ||
+            error?.response?.data?.message ||
+            'Unable to load transcript.'
+        );
+      } finally {
+        setTranscriptLoadingAttemptId(null);
+      }
+    },
+    [onViewTranscript]
+  );
+
   const handleOpenTranscript = async (action: any, attempt: any) => {
-    if (!attempt?.id || !onViewTranscript) {
+    if (!attempt?.id) {
       return;
     }
 
     setTranscriptDialogTitle(`Transcript - ${action.description} - Attempt ${attempt.attempt}`);
+    setTranscriptAttemptId(attempt.id);
     setTranscriptDialogOpen(true);
+    await loadTranscript(attempt.id);
+  };
+
+  useEffect(() => {
+    if (
+      !transcriptDialogOpen ||
+      !transcriptAttemptId ||
+      !transcriptData?.attempt?.status ||
+      transcriptData.attempt.status !== 'RUNNING'
+    ) {
+      return undefined;
+    }
+
+    const timer = window.setInterval(() => {
+      if (transcriptLoadingAttemptId === transcriptAttemptId) {
+        return;
+      }
+
+      loadTranscript(transcriptAttemptId, { keepExistingData: true });
+    }, 3000);
+
+    return () => window.clearInterval(timer);
+  }, [
+    loadTranscript,
+    transcriptAttemptId,
+    transcriptData?.attempt?.status,
+    transcriptDialogOpen,
+    transcriptLoadingAttemptId,
+  ]);
+
+  const handleCloseTranscriptDialog = () => {
+    setTranscriptDialogOpen(false);
+    setTranscriptAttemptId(null);
     setTranscriptData(null);
     setTranscriptError(null);
-    setTranscriptLoadingAttemptId(attempt.id);
-
-    try {
-      const response = await onViewTranscript(attempt.id);
-      setTranscriptData(response);
-    } catch (error: any) {
-      setTranscriptError(
-        error?.response?.data?.detail?.[0]?.msg ||
-          error?.response?.data?.detail ||
-          error?.response?.data?.message ||
-          'Unable to load transcript.'
-      );
-    } finally {
-      setTranscriptLoadingAttemptId(null);
-    }
+    setTranscriptLoadingAttemptId(null);
   };
 
   const progress = useMemo(() => {
@@ -208,10 +259,17 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
                       <MaterialSymbol
                         name={action.manual_task ? 'person' : 'settings'}
                         fontSize="small"
+                        sx={{ color: 'primary.main' }}
                       />
                       <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: '0.98rem', lineHeight: 1.3 }}>
                         {action.sequence}. {action.description}
                       </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.8rem' }}>
+                        Duration: {formatDuration(latestAttempt?.started_at, latestAttempt?.finished_at)}
+                      </Typography>
+                      {latestStatus === 'RUNNING' && (
+                        <CircularProgress size={14} thickness={5} />
+                      )}
                     </Stack>
                   </Box>
 
@@ -363,12 +421,23 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
                               key={attempt.id || `${action.code}-${attempt.attempt}`}
                               sx={{ p: 0.85, border: 1, borderColor: 'divider', borderRadius: 1 }}
                             >
+                              {(() => {
+                                const canShowTranscriptAction =
+                                  Boolean(onViewTranscript) &&
+                                  Boolean(attempt.id) &&
+                                  (
+                                    Boolean(attempt.has_transcript) ||
+                                    Boolean(action.has_transcript) ||
+                                    String(attempt.status || '').toUpperCase() === 'RUNNING'
+                                  );
+
+                                return (
                               <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={0.5}>
                                 <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.83rem' }}>
                                   Attempt {attempt.attempt}
                                 </Typography>
                                 <Stack direction="row" spacing={0.5} alignItems="center" justifyContent="flex-end">
-                                  {attempt.has_transcript && onViewTranscript && (
+                                  {canShowTranscriptAction && (
                                     <IconButton
                                       size="small"
                                       aria-label={`Load transcript for attempt ${attempt.attempt}`}
@@ -382,6 +451,8 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
                                   <Chip size="small" label={attempt.status || 'N/A'} color={statusColor(attempt.status || '') as any} />
                                 </Stack>
                               </Stack>
+                                );
+                              })()}
                               <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, fontSize: '0.8rem' }}>
                                 {formatDateTime(attempt.started_at)} - {formatDateTime(attempt.finished_at)}
                               </Typography>
@@ -476,10 +547,15 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
         preformattedFields={['configuration']}
       />
 
-      <Dialog open={transcriptDialogOpen} onClose={() => setTranscriptDialogOpen(false)} maxWidth="md" fullWidth>
+      <Dialog open={transcriptDialogOpen} onClose={handleCloseTranscriptDialog} maxWidth="md" fullWidth>
         <DialogTitle>{transcriptDialogTitle}</DialogTitle>
         <DialogContent dividers>
-          {transcriptLoadingAttemptId ? (
+          {transcriptLoadingAttemptId && transcriptData && (
+            <Box sx={{ mb: 1.25 }}>
+              <LinearProgress />
+            </Box>
+          )}
+          {!transcriptData && transcriptLoadingAttemptId ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
               <LinearProgress sx={{ width: '100%', maxWidth: 320 }} />
             </Box>
@@ -578,7 +654,7 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
           ) : null}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setTranscriptDialogOpen(false)}>Close</Button>
+          <Button onClick={handleCloseTranscriptDialog}>Close</Button>
         </DialogActions>
       </Dialog>
     </>
