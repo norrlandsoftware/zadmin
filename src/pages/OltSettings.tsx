@@ -94,6 +94,7 @@ interface BngSlotConfig {
 
 interface SoftwareControlMatrixRow {
   rowId: string;
+  swCtrl: string;
   hardwareVersion: string;
   ontType: string;
   softwareVersionFileId: string;
@@ -105,6 +106,7 @@ const ONT_TYPE_OPTIONS = ['DO', 'RGW'];
 
 const createSoftwareControlMatrixRow = (index: number): SoftwareControlMatrixRow => ({
   rowId: `software-control-${index + 1}`,
+  swCtrl: String(index + 1),
   hardwareVersion: '',
   ontType: '',
   softwareVersionFileId: '',
@@ -617,6 +619,10 @@ const OltSettings: React.FC = () => {
     setSoftwareControlMatrixRows((current) => {
       const configuredRows = settingsSoftwareControlMatrix.map((item: any, index: number) => ({
         rowId: item?.id || item?.row_id || `software-control-saved-${index + 1}`,
+        swCtrl:
+          item?.sw_ctrl != null && item?.sw_ctrl !== ''
+            ? String(item.sw_ctrl)
+            : String(index + 1),
         hardwareVersion: item?.hw_version || item?.hardware_version || '',
         ontType: item?.ont_type || '',
         softwareVersionFileId:
@@ -646,6 +652,7 @@ const OltSettings: React.FC = () => {
         if (existing) {
           return {
             ...existing,
+            swCtrl: existing.swCtrl || configured?.swCtrl || String(index + 1),
             hardwareVersion: existing.hardwareVersion || configured?.hardwareVersion || '',
             ontType: existing.ontType || configured?.ontType || '',
             softwareVersionFileId:
@@ -833,7 +840,7 @@ const OltSettings: React.FC = () => {
             row.configFileId
         )
         .map((row, index) => ({
-          sw_ctrl: index + 1,
+          sw_ctrl: row.swCtrl ? Number(row.swCtrl) : index + 1,
           hw_version: row.hardwareVersion || null,
           ont_type: row.ontType || null,
           sw_version: ontFileById.get(String(row.softwareVersionFileId || ''))?.name || null,
@@ -1599,12 +1606,12 @@ const OltSettings: React.FC = () => {
               mb: 0.5,
               display: { xs: 'none', md: 'grid' },
               gridTemplateColumns:
-                '64px minmax(170px, 1fr) 120px minmax(220px, 1fr) minmax(220px, 1fr) 56px',
+                '88px minmax(170px, 1fr) 120px minmax(220px, 1fr) minmax(220px, 1fr) 56px',
               gap: 1.25,
               alignItems: 'center',
             }}
           >
-            {['Line', 'Hardware Version', 'Ont Type', 'Software Version File', 'Config File', ''].map(
+            {['Sw Ctrl', 'Hardware Version', 'Ont Type', 'Software Version File', 'Config File', ''].map(
               (label, index) => (
                 <Typography
                   key={`${label}-${index}`}
@@ -1631,15 +1638,25 @@ const OltSettings: React.FC = () => {
                 display: 'grid',
                 gridTemplateColumns: {
                   xs: '1fr',
-                  md: '64px minmax(170px, 1fr) 120px minmax(220px, 1fr) minmax(220px, 1fr) 56px',
+                  md: '88px minmax(170px, 1fr) 120px minmax(220px, 1fr) minmax(220px, 1fr) 56px',
                 },
                 gap: 1.25,
                 alignItems: 'center',
               }}
             >
-              <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                {index + 1}
-              </Typography>
+              <TextField
+                fullWidth
+                size="small"
+                sx={compactFieldSx}
+                type="number"
+                value={row.swCtrl}
+                inputProps={{ min: 1, step: 1 }}
+                onChange={(event) =>
+                  updateSoftwareControlMatrixRow(row.rowId, {
+                    swCtrl: event.target.value,
+                  })
+                }
+              />
               <TextField
                 fullWidth
                 size="small"

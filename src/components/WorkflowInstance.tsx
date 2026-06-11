@@ -36,6 +36,9 @@ const statusColor = (status: string) => {
   return 'default';
 };
 
+const isSuccessStatus = (status?: string | null) =>
+  status === 'COMPLETED' || status === 'SUCCESS';
+
 const formatDateTime = (value?: string | null) => {
   if (!value) {
     return 'N/A';
@@ -104,6 +107,24 @@ const renderJsonLikeValue = (value: any) => {
   return JSON.stringify(value, null, 2);
 };
 
+const buildTranscriptCommandSummary = (entries: any[] | undefined) => {
+  if (!Array.isArray(entries) || entries.length === 0) {
+    return '';
+  }
+
+  return entries
+    .map((entry: any) => {
+      const command = String(entry?.command || '').trim();
+      if (!command) {
+        return '';
+      }
+
+      return command;
+    })
+    .filter(Boolean)
+    .join('\n');
+};
+
 const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
   instance,
   readOnly = false,
@@ -121,6 +142,13 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
   const [transcriptData, setTranscriptData] = useState<any>(null);
   const [transcriptError, setTranscriptError] = useState<string | null>(null);
   const [transcriptLoadingAttemptId, setTranscriptLoadingAttemptId] = useState<string | null>(null);
+  const [summaryDialogData, setSummaryDialogData] = useState<{
+    actionDescription: string;
+    attemptNumber: number | string;
+    loading: boolean;
+    error: string | null;
+    data: any;
+  } | null>(null);
 
   const loadTranscript = useCallback(
     async (attemptId: string, options?: { keepExistingData?: boolean }) => {
@@ -197,6 +225,46 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
     setTranscriptLoadingAttemptId(null);
   };
 
+  const handleOpenTranscriptSummary = useCallback(
+    async (action: any, attempt: any) => {
+      if (!action?.description || !attempt?.id || !onViewTranscript) {
+        return;
+      }
+
+      setSummaryDialogData({
+        actionDescription: action.description,
+        attemptNumber: attempt.attempt,
+        loading: true,
+        error: null,
+        data: null,
+      });
+
+      try {
+        const response = await onViewTranscript(attempt.id);
+        setSummaryDialogData({
+          actionDescription: action.description,
+          attemptNumber: attempt.attempt,
+          loading: false,
+          error: null,
+          data: response,
+        });
+      } catch (error: any) {
+        setSummaryDialogData({
+          actionDescription: action.description,
+          attemptNumber: attempt.attempt,
+          loading: false,
+          error:
+            error?.response?.data?.detail?.[0]?.msg ||
+            error?.response?.data?.detail ||
+            error?.response?.data?.message ||
+            'Unable to load transcript summary.',
+          data: null,
+        });
+      }
+    },
+    [onViewTranscript]
+  );
+
   const progress = useMemo(() => {
     const actions = instance?.actions || [];
     if (!actions.length) return 0;
@@ -238,6 +306,14 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
         {(instance.actions || []).map((action: any) => {
           const latestAttempt = action.attempts?.length ? action.attempts[action.attempts.length - 1] : null;
           const latestStatus = latestAttempt?.status || action.state || 'NOT_STARTED';
+          const lastSuccessfulAttemptWithTranscript = [...(action.attempts || [])]
+            .reverse()
+            .find(
+              (attempt: any) =>
+                isSuccessStatus(String(attempt?.status || '').toUpperCase()) &&
+                Boolean(attempt?.id) &&
+                (Boolean(attempt?.has_transcript) || Boolean(action.has_transcript))
+            );
           const configName = action.action_meta?.rendered_config_name;
           const cfg = configName ? renderedConfigByName[configName] : '';
           const canManual = !readOnly && action.is_current && action.manual_task && instance.status === 'RUNNING' && onManualAction;
@@ -306,6 +382,22 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
                     )}
 
                     {action.is_current && <Chip size="small" label="CURRENT" color="primary" />}
+                    {isSuccessStatus(String(latestStatus || '').toUpperCase()) &&
+                      lastSuccessfulAttemptWithTranscript && (
+                        <IconButton
+                          size="small"
+                          aria-label={`Show transcript summary for ${action.description}`}
+                          onClick={() =>
+                            handleOpenTranscriptSummary(
+                              action,
+                              lastSuccessfulAttemptWithTranscript
+                            )
+                          }
+                          sx={{ p: 0.25 }}
+                        >
+                          <MaterialSymbol name="build" fontSize="small" />
+                        </IconButton>
+                      )}
                     <Chip size="small" label={latestStatus} color={statusColor(latestStatus) as any} />
                     <IconButton
                       size="small"
@@ -655,6 +747,67 @@ const WorkflowInstance: React.FC<WorkflowInstanceProps> = ({
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseTranscriptDialog}>Close</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(summaryDialogData)}
+        onClose={() => setSummaryDialogData(null)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          {summaryDialogData
+            ? `Transcript Summary - ${summaryDialogData.actionDescription} - Attempt ${summaryDialogData.attemptNumber}`
+            : 'Transcript Summary'}
+        </DialogTitle>
+        <DialogContent dividers>
+          {summaryDialogData?.loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
+              <LinearProgress sx={{ width: '100%', maxWidth: 320 }} />
+            </Box>
+          ) : summaryDialogData?.error ? (
+            <Alert severity="error">{summaryDialogData.error}</Alert>
+          ) : summaryDialogData ? (
+            buildTranscriptCommandSummary(summaryDialogData.data?.entries) ? (
+              <Box sx={{ p: 1, borderRadius: 1, bgcolor: 'grey.100' }}>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    fontFamily:
+                      'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                    fontSize: '0.8rem',
+                    lineHeight: 1.45,
+                  }}
+                >
+                  {buildTranscriptCommandSummary(summaryDialogData.data?.entries)}
+                </Typography>
+              </Box>
+            ) : (
+              <Alert severity="info">No command transcript entries available.</Alert>
+            )
+          ) : null}
+        </DialogContent>
+        <DialogActions>
+          <Button
+            startIcon={<MaterialSymbol name="content_copy" fontSize="small" />}
+            onClick={async () => {
+              await navigator.clipboard.writeText(
+                buildTranscriptCommandSummary(summaryDialogData?.data?.entries)
+              );
+            }}
+            disabled={
+              !summaryDialogData ||
+              summaryDialogData.loading ||
+              Boolean(summaryDialogData.error) ||
+              !buildTranscriptCommandSummary(summaryDialogData.data?.entries)
+            }
+          >
+            Copy commands
+          </Button>
+          <Button onClick={() => setSummaryDialogData(null)}>Close</Button>
         </DialogActions>
       </Dialog>
     </>
