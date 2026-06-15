@@ -303,6 +303,20 @@ export const ontFiles = {
     const response = await api.put(`/ont_file/${id}/`, data);
     return response.data;
   },
+  upload: async (id: string, data: FormData) => {
+    const response = await api.post(`/ont_file/${id}/upload/`, data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  download: async (id: string) => {
+    const response = await api.get(`/ont_file/${id}/download`, {
+      responseType: 'blob',
+    });
+    return response;
+  },
 };
 
 export const ontFileTransfers = {

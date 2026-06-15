@@ -62,6 +62,18 @@ const formatTransferError = (error: any) =>
   error?.response?.data?.message ||
   'Unable to start ONT file transfer.';
 
+const formatUploadError = (error: any) =>
+  error?.response?.data?.detail?.[0]?.msg ||
+  error?.response?.data?.detail ||
+  error?.response?.data?.message ||
+  'Unable to update the ONT file.';
+
+const formatDownloadError = (error: any) =>
+  error?.response?.data?.detail?.[0]?.msg ||
+  error?.response?.data?.detail ||
+  error?.response?.data?.message ||
+  'Unable to download the ONT file.';
+
 const getDefaultDestinationPath = (item: any) => {
   if (item?.storage_path) {
     const parts = String(item.storage_path).split('/');
@@ -119,17 +131,23 @@ const OntFiles: React.FC = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [transferDialogOpen, setTransferDialogOpen] = useState(false);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<any>(null);
   const [viewingItem, setViewingItem] = useState<any>(null);
   const [transferItem, setTransferItem] = useState<any>(null);
+  const [uploadItem, setUploadItem] = useState<any>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [transferError, setTransferError] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [formValues, setFormValues] = useState(DEFAULT_FORM_VALUES);
   const [selectedOltId, setSelectedOltId] = useState('');
   const [activeTransferId, setActiveTransferId] = useState<string | null>(null);
   const [transferStarted, setTransferStarted] = useState(false);
   const [reportedTransferId, setReportedTransferId] = useState<string | null>(null);
   const [durationNow, setDurationNow] = useState(() => Date.now());
+  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadInputKey, setUploadInputKey] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
 
   const { data, isLoading, refetch } = useQuery(['ont-files', page, rowsPerPage], () =>
     ontFiles.getAll({ page: page + 1, size: rowsPerPage, sort: UPDATED_AT_DESC_SORT })
@@ -272,6 +290,78 @@ const OntFiles: React.FC = () => {
     setDurationNow(Date.now());
   };
 
+  const handleUploadOpen = (item: any) => {
+    setUploadItem(item);
+    setUploadDialogOpen(true);
+    setUploadError(null);
+    setUploadFile(null);
+    setUploadInputKey((current) => current + 1);
+    setIsUploading(false);
+  };
+
+  const handleUploadClose = () => {
+    setUploadDialogOpen(false);
+    setUploadItem(null);
+    setUploadError(null);
+    setUploadFile(null);
+    setUploadInputKey((current) => current + 1);
+    setIsUploading(false);
+  };
+
+  const handleUploadSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!uploadItem?.id) {
+      return;
+    }
+
+    if (!uploadFile) {
+      setUploadError('File is required.');
+      return;
+    }
+
+    setUploadError(null);
+    setIsUploading(true);
+
+    try {
+      const payload = new FormData();
+      payload.append('file', uploadFile);
+      await ontFiles.upload(uploadItem.id, payload);
+      await refetch();
+      pushResult('success', `${uploadItem.name} was updated successfully.`);
+      handleUploadClose();
+    } catch (error: any) {
+      setUploadError(formatUploadError(error));
+      setIsUploading(false);
+    }
+  };
+
+  const handleDownload = async (item: any) => {
+    try {
+      const response = await ontFiles.download(item.id);
+      const blob = response.data;
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      const contentDisposition = response.headers?.['content-disposition'];
+      const filenameMatch = contentDisposition?.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+      const decodedFilename = filenameMatch?.[1]
+        ? decodeURIComponent(filenameMatch[1].replace(/"/g, ''))
+        : null;
+      const downloadName = decodedFilename || item?.name || 'ont-file';
+
+      link.href = url;
+      link.download = downloadName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      pushResult('success', `${downloadName} downloaded successfully.`);
+    } catch (error: any) {
+      pushResult('error', formatDownloadError(error));
+    }
+  };
+
   const handleSave = async (event: React.FormEvent) => {
     event.preventDefault();
     setFormError(null);
@@ -292,7 +382,7 @@ const OntFiles: React.FC = () => {
         }
 
         const payload = new FormData();
-        payload.append('name', formValues.name);
+        payload.append('name', uploadFile.name);
         payload.append('type', formValues.type);
         if (formValues.description) {
           payload.append('description', formValues.description);
@@ -362,6 +452,8 @@ const OntFiles: React.FC = () => {
         onRowClick={handleView}
         onEdit={handleEdit}
         onTransfer={handleTransferOpen}
+        onUpload={handleUploadOpen}
+        onDownload={handleDownload}
       />
 
       <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
@@ -376,19 +468,21 @@ const OntFiles: React.FC = () => {
               </Alert>
             )}
             <FormDialogGrid>
-              <FormDialogItem>
-                <TextField
-                  autoFocus
-                  name="name"
-                  label="Name"
-                  fullWidth
-                  value={formValues.name}
-                  onChange={(event) =>
-                    setFormValues((current) => ({ ...current, name: event.target.value }))
-                  }
-                  required
-                />
-              </FormDialogItem>
+              {editingItem && (
+                <FormDialogItem>
+                  <TextField
+                    autoFocus
+                    name="name"
+                    label="Name"
+                    fullWidth
+                    value={formValues.name}
+                    onChange={(event) =>
+                      setFormValues((current) => ({ ...current, name: event.target.value }))
+                    }
+                    required
+                  />
+                </FormDialogItem>
+              )}
               <FormDialogItem>
                 <TextField
                   select
@@ -436,13 +530,18 @@ const OntFiles: React.FC = () => {
                   <TextField
                     name="file"
                     label="File"
-                    type="file"
-                    fullWidth
-                    required
-                    InputLabelProps={{ shrink: true }}
-                    inputProps={{ accept: '.cfg,.conf,.ini,.json,.txt,.xml,.bin,.img,.zip' }}
-                  />
-                </FormDialogItem>
+                  type="file"
+                  fullWidth
+                  required
+                  InputLabelProps={{ shrink: true }}
+                  onChange={(event) =>
+                    setFormValues((current) => ({
+                      ...current,
+                      name: event.target.files?.[0]?.name || '',
+                    }))
+                  }
+                />
+              </FormDialogItem>
               )}
               {formError && !dialogOpen && (
                 <FormDialogItem fullWidth>
@@ -466,6 +565,59 @@ const OntFiles: React.FC = () => {
         title="ONT File Details"
         data={detailViewItem}
       />
+
+      <Dialog
+        open={uploadDialogOpen}
+        onClose={handleUploadClose}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: formDialogPaperSx }}
+      >
+        <form onSubmit={handleUploadSubmit}>
+          <DialogTitle sx={formDialogTitleSx}>
+            Update the {uploadItem?.name || ''} file
+          </DialogTitle>
+          <DialogContent sx={formDialogContentSx}>
+            {uploadError && (
+              <Alert severity="error" sx={{ mb: 2, mt: 1 }}>
+                {uploadError}
+              </Alert>
+            )}
+            <FormDialogGrid>
+              <FormDialogItem fullWidth>
+                <TextField
+                  label="Current File"
+                  fullWidth
+                  value={uploadItem?.name || ''}
+                  InputProps={{ readOnly: true }}
+                />
+              </FormDialogItem>
+              <FormDialogItem fullWidth>
+                <TextField
+                  key={uploadInputKey}
+                  name="replacement_file"
+                  label="Replacement File"
+                  type="file"
+                  fullWidth
+                  required
+                  InputLabelProps={{ shrink: true }}
+                  onChange={(event) =>
+                    setUploadFile(event.target.files?.[0] || null)
+                  }
+                />
+              </FormDialogItem>
+            </FormDialogGrid>
+          </DialogContent>
+          <DialogActions sx={formDialogActionsSx}>
+            <Button onClick={handleUploadClose} disabled={isUploading}>
+              Cancel
+            </Button>
+            <Button type="submit" variant="contained" color="primary" disabled={isUploading}>
+              {isUploading ? 'Uploading...' : 'Upload'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
 
       <Dialog
         open={transferDialogOpen}
