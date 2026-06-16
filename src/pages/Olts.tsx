@@ -71,6 +71,9 @@ const getWorkflowInstances = (workflowInstancesResponse: any) => {
   return [];
 };
 
+const OLT_USERNAME_FIELD_NAME = 'olt_device_username';
+const OLT_PASSWORD_FIELD_NAME = 'olt_device_password';
+
 const Olts: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -323,8 +326,8 @@ const Olts: React.FC = () => {
       syslog_ip_address: nullableString(formData.get('syslog_ip_address')),
       area: nullableString(formData.get('area')),
       pop_id: nullableString(formData.get('pop_id')),
-      username: formData.get('username'),
-      password: formData.get('password'),
+      username: formData.get(OLT_USERNAME_FIELD_NAME),
+      password: formData.get(OLT_PASSWORD_FIELD_NAME),
       enabled: formData.get('enabled') === 'true',
     };
 
@@ -454,7 +457,7 @@ const Olts: React.FC = () => {
       />
 
       <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
-        <form onSubmit={handleSave} autoComplete="off">
+        <form onSubmit={handleSave} autoComplete="off" data-form-type="other">
           <DialogTitle sx={formDialogTitleSx}>
             {editingOlt ? 'Edit OLT' : 'Create New OLT'}
           </DialogTitle>
@@ -528,16 +531,21 @@ const Olts: React.FC = () => {
               <FormDialogItem fullWidth>
                 <FormDialogSectionTitle>Credentials</FormDialogSectionTitle>
                 <FormDialogGrid>
-                  <FormDialogItem>
-                    <TextField
-                      name="username"
+              <FormDialogItem>
+                <TextField
+                      name={OLT_USERNAME_FIELD_NAME}
                       label="Username"
-                      type={showUsername ? 'text' : 'password'}
+                      type="text"
                       fullWidth
                       defaultValue={editingOlt?.username || ''}
                       required
-                      autoComplete="off"
-                      inputProps={{ autoComplete: 'off', 'data-lpignore': 'true', 'data-form-type': 'other' }}
+                      autoComplete="one-time-code"
+                      inputProps={{
+                        autoComplete: 'one-time-code',
+                        'data-lpignore': 'true',
+                        'data-form-type': 'other',
+                        spellCheck: 'false',
+                      }}
                       InputProps={{
                         endAdornment: (
                           <InputAdornment position="end">
@@ -554,16 +562,20 @@ const Olts: React.FC = () => {
                       }}
                     />
                   </FormDialogItem>
-                  <FormDialogItem>
-                    <TextField
-                      name="password"
+                <FormDialogItem>
+                  <TextField
+                      name={OLT_PASSWORD_FIELD_NAME}
                       label="Password"
                       type={showPassword ? 'text' : 'password'}
                       fullWidth
                       defaultValue={editingOlt?.password || ''}
                       required
                       autoComplete="new-password"
-                      inputProps={{ autoComplete: 'new-password', 'data-lpignore': 'true', 'data-form-type': 'other' }}
+                      inputProps={{
+                        autoComplete: 'new-password',
+                        'data-lpignore': 'true',
+                        'data-form-type': 'other',
+                      }}
                       InputProps={{
                         endAdornment: (
                           <InputAdornment position="end">
