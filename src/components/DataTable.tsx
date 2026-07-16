@@ -34,6 +34,9 @@ interface DataTableProps {
   onTroubleshoot?: (row: any) => void;
   onConfigure?: (row: any) => void;
   onDocument?: (row: any) => void;
+  onTransfer?: (row: any) => void;
+  onUpload?: (row: any) => void;
+  onDownload?: (row: any) => void;
   isConfigureDisabled?: (row: any) => boolean;
 }
 
@@ -52,12 +55,37 @@ const DataTable: React.FC<DataTableProps> = ({
   onTroubleshoot,
   onConfigure,
   onDocument,
+  onTransfer,
+  onUpload,
+  onDownload,
   isConfigureDisabled,
 }) => {
-  const hasActions = Boolean(onView || onEdit || onDelete || onTroubleshoot || onConfigure || onDocument);
+  const hasActions = Boolean(
+    onView ||
+      onEdit ||
+      onDelete ||
+      onTroubleshoot ||
+      onConfigure ||
+      onDocument ||
+      onTransfer ||
+      onUpload ||
+      onDownload
+  );
   const showViewAction = Boolean(onView) && !onRowClick;
-  const actionCount = [showViewAction, onTroubleshoot, onConfigure, onDocument, onEdit, onDelete].filter(Boolean).length;
-  const actionsColumnWidth = hasActions ? Math.max(112, actionCount * 32) : 0;
+  const actionCount = [
+    showViewAction,
+    onTroubleshoot,
+    onConfigure,
+    onDocument,
+    onTransfer,
+    onUpload,
+    onDownload,
+    onEdit,
+    onDelete,
+  ].filter(Boolean).length;
+  const ACTION_ICON_SIZE = 18;
+  const ACTION_BUTTON_SIZE = 28;
+  const actionsColumnWidth = hasActions ? Math.max(96, actionCount * ACTION_BUTTON_SIZE) : 0;
   const dataColumnWidth = hasActions
     ? `calc((100% - ${actionsColumnWidth}px) / ${columns.length})`
     : `${100 / columns.length}%`;
@@ -149,6 +177,7 @@ const DataTable: React.FC<DataTableProps> = ({
                       ...bodyCellSx,
                       whiteSpace: 'nowrap',
                       width: `${actionsColumnWidth}px`,
+                      px: 0.5,
                     }}
                   >
                     {showViewAction && (
@@ -159,7 +188,7 @@ const DataTable: React.FC<DataTableProps> = ({
                           color="info"
                           sx={{ p: 0.5 }}
                         >
-                          <MaterialSymbol name="visibility" />
+                          <MaterialSymbol name="visibility" sx={{ fontSize: ACTION_ICON_SIZE }} />
                         </IconButton>
                       </Tooltip>
                     )}
@@ -171,7 +200,7 @@ const DataTable: React.FC<DataTableProps> = ({
                           color="primary"
                           sx={{ p: 0.5 }}
                         >
-                          <MaterialSymbol name="build" />
+                          <MaterialSymbol name="build" sx={{ fontSize: ACTION_ICON_SIZE }} />
                         </IconButton>
                       </Tooltip>
                     )}
@@ -185,7 +214,7 @@ const DataTable: React.FC<DataTableProps> = ({
                             sx={{ p: 0.5 }}
                             disabled={Boolean(isConfigureDisabled?.(row))}
                           >
-                            <MaterialSymbol name="settings" />
+                            <MaterialSymbol name="settings" sx={{ fontSize: ACTION_ICON_SIZE }} />
                           </IconButton>
                         </span>
                       </Tooltip>
@@ -198,7 +227,43 @@ const DataTable: React.FC<DataTableProps> = ({
                           color="primary"
                           sx={{ p: 0.5 }}
                         >
-                          <MaterialSymbol name="description" />
+                          <MaterialSymbol name="description" sx={{ fontSize: ACTION_ICON_SIZE }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {onTransfer && (
+                      <Tooltip title="TFTP File Transfer">
+                        <IconButton
+                          size="small"
+                          onClick={() => onTransfer(row)}
+                          color="primary"
+                          sx={{ p: 0.5 }}
+                        >
+                          <MaterialSymbol name="send" sx={{ fontSize: ACTION_ICON_SIZE }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {onUpload && (
+                      <Tooltip title="Upload Replacement File">
+                        <IconButton
+                          size="small"
+                          onClick={() => onUpload(row)}
+                          color="primary"
+                          sx={{ p: 0.5 }}
+                        >
+                          <MaterialSymbol name="upload" sx={{ fontSize: ACTION_ICON_SIZE }} />
+                        </IconButton>
+                      </Tooltip>
+                    )}
+                    {onDownload && (
+                      <Tooltip title="Download File">
+                        <IconButton
+                          size="small"
+                          onClick={() => onDownload(row)}
+                          color="primary"
+                          sx={{ p: 0.5 }}
+                        >
+                          <MaterialSymbol name="download" sx={{ fontSize: ACTION_ICON_SIZE }} />
                         </IconButton>
                       </Tooltip>
                     )}
@@ -210,7 +275,7 @@ const DataTable: React.FC<DataTableProps> = ({
                           color="primary"
                           sx={{ p: 0.5 }}
                         >
-                          <MaterialSymbol name="edit" />
+                          <MaterialSymbol name="edit" sx={{ fontSize: ACTION_ICON_SIZE }} />
                         </IconButton>
                       </Tooltip>
                     )}
@@ -222,7 +287,7 @@ const DataTable: React.FC<DataTableProps> = ({
                           color="error"
                           sx={{ p: 0.5 }}
                         >
-                          <MaterialSymbol name="delete" />
+                          <MaterialSymbol name="delete" sx={{ fontSize: ACTION_ICON_SIZE }} />
                         </IconButton>
                       </Tooltip>
                     )}

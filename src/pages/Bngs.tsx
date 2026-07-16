@@ -15,6 +15,7 @@ import {
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import { FormDialogGrid, FormDialogItem, FormDialogSectionTitle, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import { bngModels, bngs } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
@@ -154,12 +155,12 @@ const Bngs: React.FC = () => {
         onEdit={handleEdit}
       />
 
-      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="sm" fullWidth>
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
         <form onSubmit={handleSave} autoComplete="off">
-          <DialogTitle>
+          <DialogTitle sx={formDialogTitleSx}>
             {editingBng ? 'Edit BNG' : 'Create New BNG'}
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={formDialogContentSx}>
             <Box sx={{ display: 'none' }} aria-hidden="true">
               <input type="text" name="fake_username" autoComplete="username" tabIndex={-1} />
               <input type="password" name="fake_password" autoComplete="current-password" tabIndex={-1} />
@@ -169,79 +170,21 @@ const Bngs: React.FC = () => {
                 {formError}
               </Alert>
             )}
-            <TextField
-              autoFocus
-              margin="dense"
-              name="name"
-              label="Name"
-              type="text"
-              fullWidth
-              defaultValue={editingBng?.name || ''}
-              required
-            />
-            <TextField
-              select
-              margin="dense"
-              name="model_id"
-              label="Model"
-              fullWidth
-              defaultValue={editingBng?.model_id || ''}
-            >
-              <MenuItem value="">N/A</MenuItem>
-              {(bngModelsData?.data || []).map((model: any) => (
-                <MenuItem key={model.id} value={model.id}>
-                  {model.name}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              margin="dense"
-              name="ip_address_v4"
-              label="IP Address"
-              type="text"
-              fullWidth
-              defaultValue={editingBng?.ip_address_v4 || ''}
-            />
-            <TextField
-              margin="dense"
-              name="username"
-              label="Username"
-              type="text"
-              fullWidth
-              defaultValue={editingBng?.username || ''}
-              autoComplete="off"
-              inputProps={{
-                autoComplete: 'off',
-                'data-lpignore': 'true',
-                'data-form-type': 'other',
-              }}
-            />
-            <TextField
-              margin="dense"
-              name="password"
-              label="Password"
-              type="password"
-              fullWidth
-              defaultValue={editingBng?.password || ''}
-              autoComplete="new-password"
-              inputProps={{
-                autoComplete: 'new-password',
-                'data-lpignore': 'true',
-                'data-form-type': 'other',
-              }}
-            />
-            <TextField
-              margin="dense"
-              name="description"
-              label="Description"
-              type="text"
-              fullWidth
-              multiline
-              rows={3}
-              defaultValue={editingBng?.description || ''}
-            />
+            <FormDialogGrid>
+              <FormDialogItem><TextField autoFocus name="name" label="Name" type="text" fullWidth defaultValue={editingBng?.name || ''} required /></FormDialogItem>
+              <FormDialogItem><TextField select name="model_id" label="Model" fullWidth defaultValue={editingBng?.model_id || ''}><MenuItem value="">N/A</MenuItem>{(bngModelsData?.data || []).map((model: any) => <MenuItem key={model.id} value={model.id}>{model.name}</MenuItem>)}</TextField></FormDialogItem>
+              <FormDialogItem><TextField name="ip_address_v4" label="IP Address" type="text" fullWidth defaultValue={editingBng?.ip_address_v4 || ''} /></FormDialogItem>
+              <FormDialogItem fullWidth>
+                <FormDialogSectionTitle>Credentials</FormDialogSectionTitle>
+                <FormDialogGrid>
+                  <FormDialogItem><TextField name="username" label="Username" type="text" fullWidth defaultValue={editingBng?.username || ''} autoComplete="off" inputProps={{ autoComplete: 'off', 'data-lpignore': 'true', 'data-form-type': 'other' }} /></FormDialogItem>
+                  <FormDialogItem><TextField name="password" label="Password" type="password" fullWidth defaultValue={editingBng?.password || ''} autoComplete="new-password" inputProps={{ autoComplete: 'new-password', 'data-lpignore': 'true', 'data-form-type': 'other' }} /></FormDialogItem>
+                </FormDialogGrid>
+              </FormDialogItem>
+              <FormDialogItem fullWidth><TextField name="description" label="Description" type="text" fullWidth multiline rows={3} defaultValue={editingBng?.description || ''} /></FormDialogItem>
+            </FormDialogGrid>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={formDialogActionsSx}>
             <Button onClick={handleClose}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary">
               Save

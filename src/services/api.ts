@@ -268,7 +268,13 @@ const createCrudApi = (path: string) => ({
   },
 });
 
-export const oltModels = createCrudApi('/olt_model');
+export const oltModels = {
+  ...createCrudApi('/olt_model'),
+  getByCode: async (code: string) => {
+    const response = await api.get('/olt_model/', { params: { q: `code:${code}`, page: 1, size: 1 } });
+    return response.data?.data?.[0] || null;
+  },
+};
 export const oltLineCardModels = createCrudApi('/olt_line_card_model');
 export const oltUplinkCardModels = createCrudApi('/olt_uplink_card_model');
 export const bngModels = createCrudApi('/bng_model');
@@ -276,3 +282,89 @@ export const switchModels = createCrudApi('/switch_model');
 export const bngs = createCrudApi('/bng');
 export const switches = createCrudApi('/switch');
 export const oltRenderedConfigurations = createCrudApi('/olt_rendered_config');
+export const ontFiles = {
+  getAll: async (params?: any) => {
+    const response = await api.get('/ont_file/', { params });
+    return response.data;
+  },
+  getById: async (id: string) => {
+    const response = await api.get(`/ont_file/${id}/`);
+    return response.data;
+  },
+  create: async (data: FormData) => {
+    const response = await api.post('/ont_file/', data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  update: async (id: string, data: any) => {
+    const response = await api.put(`/ont_file/${id}/`, data);
+    return response.data;
+  },
+  upload: async (id: string, data: FormData) => {
+    const response = await api.post(`/ont_file/${id}/upload/`, data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+  download: async (id: string) => {
+    const response = await api.get(`/ont_file/${id}/download`, {
+      responseType: 'blob',
+    });
+    return response;
+  },
+};
+
+export const ontFileTransfers = {
+  create: async (data: {
+    ont_file_id: string;
+    olt_id: string;
+    destination_path: string;
+    target_host?: string | null;
+    target_port?: number;
+    timeout_seconds?: number;
+  }) => {
+    const response = await api.post('/ont_file_transfer/', data);
+    return response.data;
+  },
+  getById: async (id: string) => {
+    const response = await api.get(`/ont_file_transfer/${id}/`);
+    return response.data;
+  },
+};
+
+
+export const workflows = {
+  startOltInitialization: async (oltId: string) => {
+    const response = await api.post(`/olt/${oltId}/workflow/initialization/start`);
+    return response.data;
+  },
+  getOltInstances: async (oltId: string) => {
+    const response = await api.get(`/olt/${oltId}/workflow_instances`);
+    return response.data;
+  },
+  getInstance: async (instanceId: string) => {
+    const response = await api.get(`/workflow_instance/${instanceId}`);
+    return response.data;
+  },
+  getActionTranscript: async (attemptId: string) => {
+    const response = await api.get(`/workflow_instance_action/${attemptId}/transcript`);
+    return response.data;
+  },
+  stopInstance: async (instanceId: string, reason?: string) => {
+    const response = await api.post(`/workflow_instance/${instanceId}/stop`, { reason });
+    return response.data;
+  },
+  completeManualAction: async (instanceId: string, actionCode: string, success: boolean, note?: string) => {
+    const response = await api.post(`/workflow_instance/${instanceId}/action/${actionCode}/manual`, { success, note });
+    return response.data;
+  },
+  retryAutomaticAction: async (instanceId: string, actionCode: string) => {
+    const response = await api.post(`/workflow_instance/${instanceId}/action/${actionCode}/retry`);
+    return response.data;
+  },
+};

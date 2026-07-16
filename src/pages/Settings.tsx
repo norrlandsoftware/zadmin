@@ -14,6 +14,7 @@ import {
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import { FormDialogGrid, FormDialogItem, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import { apiConfigs } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
@@ -143,54 +144,25 @@ const Settings: React.FC = () => {
         onEdit={handleEdit}
       />
 
-      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth>
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
         <form onSubmit={handleSave}>
-          <DialogTitle>
+          <DialogTitle sx={formDialogTitleSx}>
             {editingConfig ? 'Edit API Config' : 'Create New API Config'}
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={formDialogContentSx}>
             {formError && (
               <Alert severity="error" sx={{ mb: 2, mt: 1 }}>
                 {formError}
               </Alert>
             )}
-            <TextField
-              autoFocus
-              margin="dense"
-              name="name"
-              label="Name"
-              type="text"
-              fullWidth
-              defaultValue={editingConfig?.name || ''}
-            />
-            <TextField
-              margin="dense"
-              name="component"
-              label="Component"
-              type="text"
-              fullWidth
-              defaultValue={editingConfig?.component || ''}
-            />
-            <TextField
-              margin="dense"
-              name="type"
-              label="Type"
-              type="text"
-              fullWidth
-              defaultValue={editingConfig?.type || ''}
-            />
-            <TextField
-              margin="dense"
-              name="config"
-              label="Config (JSON)"
-              multiline
-              minRows={10}
-              fullWidth
-              value={configValue}
-              onChange={(event) => setConfigValue(event.target.value)}
-            />
+            <FormDialogGrid>
+              <FormDialogItem><TextField autoFocus name="name" label="Name" type="text" fullWidth defaultValue={editingConfig?.name || ''} /></FormDialogItem>
+              <FormDialogItem><TextField name="component" label="Component" type="text" fullWidth defaultValue={editingConfig?.component || ''} /></FormDialogItem>
+              <FormDialogItem><TextField name="type" label="Type" type="text" fullWidth defaultValue={editingConfig?.type || ''} /></FormDialogItem>
+              <FormDialogItem fullWidth><TextField name="config" label="Config (JSON)" multiline minRows={10} fullWidth value={configValue} onChange={(event) => setConfigValue(event.target.value)} /></FormDialogItem>
+            </FormDialogGrid>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={formDialogActionsSx}>
             <Button onClick={handleClose}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary">
               Save

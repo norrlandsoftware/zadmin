@@ -29,6 +29,7 @@ import {
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import { FormDialogGrid, FormDialogItem, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import { onts, olts } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
@@ -116,6 +117,54 @@ const formatOpticalMetric = (value: any): string => {
   }
 
   return String(value);
+};
+
+const parseNumericMetric = (value: any): number | null => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const MARGIN_SCALE_MIN = -2;
+const MARGIN_SCALE_MAX = 8;
+const MARGIN_SEGMENTS = [
+  { label: 'poor', min: -2, max: 0, color: '#e52400', textColor: '#111' },
+  { label: 'fair', min: 0, max: 2, color: '#f6a400', textColor: '#111' },
+  { label: 'good', min: 2, max: 5, color: '#7fff1f', textColor: '#111' },
+  { label: 'excellent', min: 5, max: 8, color: '#66a80f', textColor: '#111' },
+];
+
+const getMarginMarkerPosition = (marginValue: number | null): number | null => {
+  if (marginValue === null) {
+    return null;
+  }
+
+  const clamped = Math.min(MARGIN_SCALE_MAX, Math.max(MARGIN_SCALE_MIN, marginValue));
+
+  if (clamped <= 0) {
+    return ((clamped - MARGIN_SCALE_MIN) / (0 - MARGIN_SCALE_MIN)) * 20;
+  }
+
+  if (clamped <= 2) {
+    return 20 + (clamped / 2) * 20;
+  }
+
+  if (clamped <= 5) {
+    return 40 + ((clamped - 2) / 3) * 30;
+  }
+
+  return 70 + ((clamped - 5) / (MARGIN_SCALE_MAX - 5)) * 30;
+};
+
+const getMarginTickPosition = (tick: number) => {
+  if (tick <= 2) {
+    return 20 + (tick / 2) * 20;
+  }
+
+  return 40 + ((tick - 2) / 3) * 30;
 };
 
 type ConfigurationFilter = 'fullyConfigured' | 'notFullyConfigured' | '';
@@ -427,64 +476,21 @@ const Onts: React.FC = () => {
         onEdit={handleEdit}
       />
 
-      <Dialog open={dialogOpen} onClose={handleClose}>
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
         <form onSubmit={handleSave}>
-          <DialogTitle>
+          <DialogTitle sx={formDialogTitleSx}>
             {editingOnt ? 'Edit ONT' : 'Create New ONT'}
           </DialogTitle>
-          <DialogContent>
-            <TextField
-              autoFocus
-              margin="dense"
-              name="serial_number"
-              label="Serial Number"
-              type="text"
-              fullWidth
-              defaultValue={editingOnt?.serial_number || ''}
-              required
-            />
-            <TextField
-              margin="dense"
-              name="vendor"
-              label="Vendor"
-              type="text"
-              fullWidth
-              defaultValue={editingOnt?.vendor || ''}
-            />
-            <TextField
-              margin="dense"
-              name="model"
-              label="Model"
-              type="text"
-              fullWidth
-              defaultValue={editingOnt?.model || ''}
-            />
-            <TextField
-              select
-              margin="dense"
-              name="olt_id"
-              label="OLT"
-              fullWidth
-              defaultValue={editingOnt?.olt_id || ''}
-              required
-            >
-              {oltsData?.data.map((olt: any) => (
-                <MenuItem key={olt.id} value={olt.id}>
-                  {olt.name}
-                </MenuItem>
-              ))}
-            </TextField>
-            <TextField
-              margin="dense"
-              name="port"
-              label="Port"
-              type="text"
-              fullWidth
-              defaultValue={editingOnt?.port || ''}
-              required
-            />
+          <DialogContent sx={formDialogContentSx}>
+            <FormDialogGrid>
+              <FormDialogItem><TextField autoFocus name="serial_number" label="Serial Number" type="text" fullWidth defaultValue={editingOnt?.serial_number || ''} required /></FormDialogItem>
+              <FormDialogItem><TextField name="vendor" label="Vendor" type="text" fullWidth defaultValue={editingOnt?.vendor || ''} /></FormDialogItem>
+              <FormDialogItem><TextField name="model" label="Model" type="text" fullWidth defaultValue={editingOnt?.model || ''} /></FormDialogItem>
+              <FormDialogItem><TextField select name="olt_id" label="OLT" fullWidth defaultValue={editingOnt?.olt_id || ''} required>{oltsData?.data.map((olt: any) => <MenuItem key={olt.id} value={olt.id}>{olt.name}</MenuItem>)}</TextField></FormDialogItem>
+              <FormDialogItem><TextField name="port" label="Port" type="text" fullWidth defaultValue={editingOnt?.port || ''} required /></FormDialogItem>
+            </FormDialogGrid>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={formDialogActionsSx}>
             <Button onClick={handleClose}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary">
               Save
@@ -565,6 +571,8 @@ const Onts: React.FC = () => {
                     .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
                     .map((troubleshoot: any) => {
                       const isExpanded = expandedRows.has(troubleshoot.id);
+                      const marginValue = parseNumericMetric(troubleshoot.margin);
+                      const marginMarkerPosition = getMarginMarkerPosition(marginValue);
                       return (
                         <React.Fragment key={troubleshoot.id}>
                           <TableRow sx={{ '& > *': { borderBottom: 'unset' } }}>
@@ -903,7 +911,7 @@ const Onts: React.FC = () => {
                                             color: 'error.main',
                                           }}
                                         >
-                                          {formatOpticalMetric(troubleshoot.actual_loss ?? troubleshoot.expected_loss)}
+                                          {`loss = ${formatOpticalMetric(troubleshoot.actual_loss ?? troubleshoot.expected_loss)}`}
                                         </Typography>
                                         <Typography
                                           sx={{
@@ -929,6 +937,98 @@ const Onts: React.FC = () => {
                                         >
                                           {formatOpticalMetric(troubleshoot.ont_tx_level)}
                                         </Typography>
+                                        </Box>
+                                        <Box
+                                          sx={{
+                                            mt: 1.5,
+                                            minWidth: 360,
+                                            maxWidth: 420,
+                                            mx: 'auto',
+                                          }}
+                                        >
+                                          <Typography
+                                            variant="body2"
+                                            sx={{
+                                              textAlign: 'center',
+                                              fontWeight: 600,
+                                              color: 'text.primary',
+                                              mb: 1.25,
+                                            }}
+                                          >
+                                            {`margin = ${formatOpticalMetric(troubleshoot.margin)}`}
+                                          </Typography>
+                                          <Box sx={{ position: 'relative', px: 0.5, pt: 2 }}>
+                                            {marginMarkerPosition !== null && (
+                                              <Box
+                                                sx={{
+                                                  position: 'absolute',
+                                                  top: 0,
+                                                  left: `${marginMarkerPosition}%`,
+                                                  transform: 'translateX(-50%)',
+                                                  width: 0,
+                                                  height: 0,
+                                                  borderLeft: '7px solid transparent',
+                                                  borderRight: '7px solid transparent',
+                                                  borderTop: '16px solid #111',
+                                                  zIndex: 2,
+                                                }}
+                                              />
+                                            )}
+                                            <Box
+                                              sx={{
+                                                display: 'grid',
+                                                gridTemplateColumns: '2fr 2fr 3fr 3fr',
+                                                border: 1,
+                                                borderColor: '#7d5a00',
+                                                overflow: 'hidden',
+                                              }}
+                                            >
+                                              {MARGIN_SEGMENTS.map((segment) => (
+                                                <Box
+                                                  key={segment.label}
+                                                  sx={{
+                                                    backgroundColor: segment.color,
+                                                    color: segment.textColor,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    minHeight: 20,
+                                                    fontSize: '0.78rem',
+                                                    fontWeight: 600,
+                                                    textTransform: 'lowercase',
+                                                    borderRight: segment.label !== 'excellent' ? '1px solid rgba(0, 0, 0, 0.25)' : 'none',
+                                                  }}
+                                                >
+                                                  {segment.label}
+                                                </Box>
+                                              ))}
+                                            </Box>
+                                            <Box
+                                              sx={{
+                                                position: 'relative',
+                                                mt: 0.35,
+                                                height: 14,
+                                                color: 'text.primary',
+                                                fontWeight: 600,
+                                                fontSize: '0.72rem',
+                                              }}
+                                            >
+                                              {[0, 1, 2, 3, 4, 5].map((tick) => (
+                                                <Box
+                                                  key={tick}
+                                                  sx={{
+                                                    position: 'absolute',
+                                                    left: `${getMarginTickPosition(tick)}%`,
+                                                    transform: 'translateX(-50%)',
+                                                    minWidth: 12,
+                                                    textAlign: 'center',
+                                                  }}
+                                                >
+                                                  {tick}
+                                                </Box>
+                                              ))}
+                                            </Box>
+                                          </Box>
                                         </Box>
                                       </Box>
                                     )}

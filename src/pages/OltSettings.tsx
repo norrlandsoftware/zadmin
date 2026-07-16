@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import MaterialSymbol from '../components/MaterialSymbol.tsx';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -26,6 +26,7 @@ import {
   bngs,
   oltLineCardModels,
   oltModels,
+  ontFiles,
   oltSettings,
   oltUplinkCardModels,
   olts,
@@ -79,8 +80,9 @@ interface UplinkSlotConfig {
   uplinkCardModelId: string;
   switchId: string;
   switchPort: string;
-  switchIpAddress: string;
-  oltPort: string;
+  ptpNetwork: string;
+  lag: boolean;
+  uplinkPorts: string[];
 }
 
 interface BngSlotConfig {
@@ -90,12 +92,34 @@ interface BngSlotConfig {
   priority: string;
 }
 
+interface SoftwareControlMatrixRow {
+  rowId: string;
+  swCtrl: string;
+  hardwareVersion: string;
+  ontType: string;
+  softwareVersionFileId: string;
+  configFileId: string;
+}
+
+const SOFTWARE_CONTROL_MATRIX_MIN_ROWS = 4;
+const ONT_TYPE_OPTIONS = ['DO', 'RGW'];
+
+const createSoftwareControlMatrixRow = (index: number): SoftwareControlMatrixRow => ({
+  rowId: `software-control-${index + 1}`,
+  swCtrl: String(index + 1),
+  hardwareVersion: '',
+  ontType: '',
+  softwareVersionFileId: '',
+  configFileId: '',
+});
+
 const OltSettings: React.FC = () => {
   const { id = '' } = useParams();
   const navigate = useNavigate();
   const [ponSlots, setPonSlots] = useState<PonSlotConfig[]>([]);
   const [uplinkSlots, setUplinkSlots] = useState<UplinkSlotConfig[]>([]);
   const [bngSlots, setBngSlots] = useState<BngSlotConfig[]>([]);
+  const [softwareControlMatrixRows, setSoftwareControlMatrixRows] = useState<SoftwareControlMatrixRow[]>([]);
   const [applyAllPonSlots, setApplyAllPonSlots] = useState(false);
   const [confirmSaveOpen, setConfirmSaveOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -131,9 +155,9 @@ const OltSettings: React.FC = () => {
   );
 
   const { data: oltModel, isLoading: isOltModelLoading } = useQuery(
-    ['olt-settings-model', olt?.model_id],
-    () => oltModels.getById(olt.model_id),
-    { enabled: Boolean(olt?.model_id) }
+    ['olt-settings-model', olt?.model_code],
+    () => oltModels.getByCode(olt.model_code),
+    { enabled: Boolean(olt?.model_code) }
   );
 
   const canLoadReferencedResources =
@@ -166,6 +190,12 @@ const OltSettings: React.FC = () => {
     [settingsElements]
   );
 
+  const settingsSoftwareControlMatrix = useMemo(
+    () =>
+      ((settingsElements?.ont_sw_ctrl_matrix as any[]) || (settingsElements?.software_control_matrix as any[]) || []),
+    [settingsElements]
+  );
+
   const { data: lineCardModelsData, isLoading: isLineCardModelsLoading } = useQuery(
     ['olt-line-card-models-settings'],
     () => oltLineCardModels.getAll({ size: 1000, sort: 'name' }),
@@ -183,6 +213,11 @@ const OltSettings: React.FC = () => {
     () => switches.getAll({ size: 1000, sort: 'name', q: 'type:DISTRIBUTION' }),
     { enabled: canLoadReferencedResources }
   );
+  const { data: oltsData, isLoading: isOltsLoading } = useQuery(
+    ['olts-settings-uplink-devices'],
+    () => olts.getAll({ size: 1000, sort: 'name' }),
+    { enabled: canLoadReferencedResources }
+  );
   const { data: bngsData, isLoading: isBngsLoading } = useQuery(
     ['bngs-settings'],
     () => bngs.getAll({ size: 1000, sort: 'name' }),
@@ -191,6 +226,11 @@ const OltSettings: React.FC = () => {
   const { data: bngModelsData, isLoading: isBngModelsLoading } = useQuery(
     ['bng-models-settings'],
     () => bngModels.getAll({ size: 1000, sort: 'name' }),
+    { enabled: canLoadReferencedResources }
+  );
+  const { data: ontFilesData, isLoading: isOntFilesLoading } = useQuery(
+    ['ont-files-settings'],
+    () => ontFiles.getAll({ size: 1000, sort: 'name' }),
     { enabled: canLoadReferencedResources }
   );
 
@@ -211,12 +251,12 @@ const OltSettings: React.FC = () => {
     [lineCardModelsData]
   );
   const currentOltModelCode = oltModel?.code || '';
-  const currentOltModelId = olt?.model_id != null ? String(olt.model_id) : '';
+  const currentOltModelId = String(oltModel?.id || '');
   const compatibleLineCardModels = useMemo(
     () =>
       (lineCardModelsData?.data || []).filter((model: any) => {
         const supportedCodes = Array.isArray(model?.olt_model_codes) ? model.olt_model_codes : [];
-        const supportedIds = Array.isArray(model?.olt_model_ids) ? model.olt_model_ids.map(String) : [];
+        const supportedIds = Array.isArray(model?.olt_model_ids) ? model.olt_model_ids.map((value: any) => String(value)) : [];
         if (supportedCodes.length === 0 && supportedIds.length === 0) {
           return true;
         }
@@ -237,11 +277,18 @@ const OltSettings: React.FC = () => {
       ),
     [uplinkCardModelsData]
   );
+  const uplinkCardModelById = useMemo(
+    () =>
+      new Map(
+        (uplinkCardModelsData?.data || []).map((model: any) => [String(model.id), model])
+      ),
+    [uplinkCardModelsData]
+  );
   const compatibleUplinkCardModels = useMemo(
     () =>
       (uplinkCardModelsData?.data || []).filter((model: any) => {
         const supportedCodes = Array.isArray(model?.olt_model_codes) ? model.olt_model_codes : [];
-        const supportedIds = Array.isArray(model?.olt_model_ids) ? model.olt_model_ids.map(String) : [];
+        const supportedIds = Array.isArray(model?.olt_model_ids) ? model.olt_model_ids.map((value: any) => String(value)) : [];
         if (supportedCodes.length === 0 && supportedIds.length === 0) {
           return true;
         }
@@ -262,6 +309,38 @@ const OltSettings: React.FC = () => {
     () => new Map((switchesData?.data || []).map((item: any) => [item.name, item])),
     [switchesData]
   );
+  const oltById = useMemo(
+    () => new Map((oltsData?.data || []).map((item: any) => [String(item.id), item])),
+    [oltsData]
+  );
+
+  const oltByName = useMemo(
+    () => new Map((oltsData?.data || []).map((item: any) => [item.name, item])),
+    [oltsData]
+  );
+
+  const availableUplinkDevices = useMemo(
+    () => [
+      ...(switchesData?.data || []).map((item: any) => ({
+        id: String(item.id),
+        name: item.name || String(item.id),
+        type: 'switch',
+      })),
+      ...(oltsData?.data || [])
+        .filter((item: any) => String(item.id) !== String(id))
+        .map((item: any) => ({
+          id: String(item.id),
+          name: item.name || String(item.id),
+          type: 'olt',
+        })),
+    ],
+    [id, oltsData, switchesData]
+  );
+
+  const uplinkDeviceById = useMemo(
+    () => new Map(availableUplinkDevices.map((item: any) => [item.id, item])),
+    [availableUplinkDevices]
+  );
   const bngModelById = useMemo(
     () => new Map((bngModelsData?.data || []).map((model: any) => [String(model.id), model])),
     [bngModelsData]
@@ -280,6 +359,30 @@ const OltSettings: React.FC = () => {
     return [...base, ...fallback];
   }, [bngsData, settingsBngIds]);
 
+  const softwareVersionFileOptions = useMemo(
+    () =>
+      (ontFilesData?.data || []).filter(
+        (item: any) => String(item?.type || '').toUpperCase() === 'SW_VER'
+      ),
+    [ontFilesData]
+  );
+
+  const configFileOptions = useMemo(
+    () =>
+      (ontFilesData?.data || []).filter(
+        (item: any) => String(item?.type || '').toUpperCase() === 'CONFIG'
+      ),
+    [ontFilesData]
+  );
+  const ontFileById = useMemo(
+    () => new Map((ontFilesData?.data || []).map((item: any) => [String(item.id), item])),
+    [ontFilesData]
+  );
+  const ontFileByName = useMemo(
+    () => new Map((ontFilesData?.data || []).map((item: any) => [String(item.name), item])),
+    [ontFilesData]
+  );
+
   const settingsPonBySlot = useMemo(
     () =>
       new Map(
@@ -288,21 +391,53 @@ const OltSettings: React.FC = () => {
     [settingsLinecards]
   );
 
+  const uplinkSlotNames = useMemo(() => {
+    const configuredNames = Array.isArray(oltModel?.uplink_line_card_slots_name)
+      ? oltModel.uplink_line_card_slots_name.map((name: any) => String(name).trim()).filter(Boolean)
+      : [];
+    if (configuredNames.length > 0) {
+      return configuredNames;
+    }
+    const fallbackCount = Number(oltModel?.number_of_uplink_card_slots || 0);
+    return Array.from({ length: fallbackCount }, (_, index) => `uplink${index + 1}`);
+  }, [oltModel?.number_of_uplink_card_slots, oltModel?.uplink_line_card_slots_name]);
+
+  const getUplinkSlotName = useCallback(
+    (slotNumber: number) => uplinkSlotNames[slotNumber - 1] || `uplink${slotNumber}`,
+    [uplinkSlotNames]
+  );
+
+  const getAvailableUplinkPortNames = useCallback(
+    (uplinkCardModelId: string) => {
+      const model = uplinkCardModelById.get(String(uplinkCardModelId));
+      if (!model) {
+        return [];
+      }
+
+      if (Array.isArray(model.uplink_port_names) && model.uplink_port_names.length > 0) {
+        return model.uplink_port_names.map((name: any) => String(name)).filter(Boolean);
+      }
+
+      const portCount = Number(model.number_of_port || 0);
+      return Array.from({ length: portCount }, (_, index) => `port${index + 1}`);
+    },
+    [uplinkCardModelById]
+  );
+
   const settingsUplinkBySlot = useMemo(
     () =>
       new Map(
-        (settingsUplinks
-          .map((item: any) => {
-            const match = String(item?.name || '').match(/^uplink(\d+)$/);
-            return [match ? Number(match[1]) : null, item] as const;
-          })
-          .filter(([slotNumber]) => Number.isFinite(slotNumber) && (slotNumber as number) > 0))
+        uplinkSlotNames.map((slotName, index) => {
+          const configuredItem = settingsUplinks.find((item: any) => String(item?.name || '') === slotName)
+            || settingsUplinks[index];
+          return [index + 1, configuredItem] as const;
+        })
       ),
-    [settingsUplinks]
+    [settingsUplinks, uplinkSlotNames]
   );
 
   useEffect(() => {
-    const ponSlotCount = Number(oltModel?.number_of_pon_slots || 0);
+    const ponSlotCount = Number(oltModel?.number_of_line_card_slots || 0);
     const ponSlotNumbers = Array.from({ length: ponSlotCount }, (_, index) => index + 1);
 
     setPonSlots((current) =>
@@ -326,10 +461,10 @@ const OltSettings: React.FC = () => {
     if (ponSlotNumbers.length <= 1) {
       setApplyAllPonSlots(false);
     }
-  }, [oltModel?.number_of_pon_slots, settingsElements, settingsPonBySlot]);
+  }, [oltModel?.number_of_line_card_slots, settingsElements, settingsPonBySlot]);
 
   useEffect(() => {
-    const uplinkSlotCount = Number(oltModel?.number_of_uplink_slots || 0);
+    const uplinkSlotCount = Number(oltModel?.number_of_uplink_card_slots || 0);
     const uplinkSlotNumbers = Array.from({ length: uplinkSlotCount }, (_, index) => index + 1);
 
     setUplinkSlots((current) =>
@@ -344,12 +479,20 @@ const OltSettings: React.FC = () => {
           uplinkCardModelId: '',
           switchId: item?.configuration?.uplink_device_id || '',
           switchPort: item?.configuration?.switch_port || '',
-          switchIpAddress: item?.configuration?.ip_address || '',
-          oltPort: item?.configuration?.olt_port || '',
+          ptpNetwork: item?.configuration?.ptp_network || item?.configuration?.ip_address || '',
+          lag: Boolean(item?.configuration?.lag),
+          uplinkPorts: Array.isArray(item?.configuration?.uplink_port)
+            ? item.configuration.uplink_port
+                .map((value: any) => String(value))
+                .filter(Boolean)
+                .map((value: string) => value.split(':').slice(1).join(':') || value)
+            : item?.configuration?.olt_port
+              ? [String(item.configuration.olt_port)]
+              : [],
         };
       })
     );
-  }, [oltModel?.number_of_uplink_slots, settingsElements, settingsUplinkBySlot]);
+  }, [oltModel?.number_of_uplink_card_slots, settingsElements, settingsUplinkBySlot]);
 
   // Reconcile slot selections when referenced resources arrive after initial settings hydration.
   useEffect(() => {
@@ -385,32 +528,50 @@ const OltSettings: React.FC = () => {
           uplinkCardModelByCode.get(source.olt_uplink_card_model_code || '')?.id ||
           source.olt_uplink_card_model_id ||
           '';
-        const configuredSwitchId = source.configuration?.uplink_device_id || '';
-        const configuredSwitch =
-          switchById.get(configuredSwitchId) ||
-          switchByName.get(source.configuration?.uplink_device_name || '');
+        const configuredDeviceId = source.configuration?.uplink_device_id || '';
+        const configuredDeviceType = String(source.configuration?.uplink_device_type || '').toLowerCase();
+        const configuredDeviceName = source.configuration?.uplink_device_name || source.configuration?.uplink_interface_name || '';
+        const configuredDevice =
+          (configuredDeviceType === 'olt'
+            ? oltById.get(String(configuredDeviceId)) || oltByName.get(configuredDeviceName)
+            : switchById.get(configuredDeviceId) || switchByName.get(configuredDeviceName)) ||
+          uplinkDeviceById.get(String(configuredDeviceId));
 
         return {
           ...slot,
           uplinkCardModelId: slot.uplinkCardModelId || resolvedModelId || '',
-          switchId: slot.switchId || configuredSwitchId || configuredSwitch?.id || '',
+          switchId: slot.switchId || configuredDeviceId || configuredDevice?.id || '',
           switchPort: slot.switchPort || source.configuration?.switch_port || '',
-          switchIpAddress:
-            slot.switchIpAddress ||
-            configuredSwitch?.ip_address_v4 ||
+          ptpNetwork:
+            slot.ptpNetwork ||
+            source.configuration?.ptp_network ||
             source.configuration?.ip_address ||
             '',
-          oltPort: slot.oltPort || source.configuration?.olt_port || '',
+          lag: slot.lag || Boolean(source.configuration?.lag),
+          uplinkPorts:
+            slot.uplinkPorts.length > 0
+              ? slot.uplinkPorts
+              : Array.isArray(source.configuration?.uplink_port)
+                ? source.configuration.uplink_port
+                    .map((value: any) => String(value))
+                    .filter(Boolean)
+                    .map((value: string) => value.split(':').slice(1).join(':') || value)
+                : source.configuration?.olt_port
+                  ? [String(source.configuration.olt_port)]
+                  : [],
         };
       })
     );
   }, [
     lineCardModelByCode,
+    oltById,
+    oltByName,
     settingsElements,
     settingsPonBySlot,
     settingsUplinkBySlot,
     switchById,
     switchByName,
+    uplinkDeviceById,
     uplinkCardModelByCode,
   ]);
 
@@ -453,6 +614,61 @@ const OltSettings: React.FC = () => {
       })
     );
   }, [settingsElements]);
+
+  useEffect(() => {
+    setSoftwareControlMatrixRows((current) => {
+      const configuredRows = settingsSoftwareControlMatrix.map((item: any, index: number) => ({
+        rowId: item?.id || item?.row_id || `software-control-saved-${index + 1}`,
+        swCtrl:
+          item?.sw_ctrl != null && item?.sw_ctrl !== ''
+            ? String(item.sw_ctrl)
+            : String(index + 1),
+        hardwareVersion: item?.hw_version || item?.hardware_version || '',
+        ontType: item?.ont_type || '',
+        softwareVersionFileId:
+          ontFileByName.get(item?.sw_version || '')?.id ||
+          item?.software_version_file_id ||
+          item?.software_version_ont_file_id ||
+          item?.software_version_file?.id ||
+          '',
+        configFileId:
+          ontFileByName.get(item?.cfg_file || '')?.id ||
+          item?.config_file_id ||
+          item?.config_ont_file_id ||
+          item?.config_file?.id ||
+          '',
+      }));
+
+      const targetLength = Math.max(
+        SOFTWARE_CONTROL_MATRIX_MIN_ROWS,
+        configuredRows.length,
+        current.length
+      );
+
+      return Array.from({ length: targetLength }, (_, index) => {
+        const existing = current[index];
+        const configured = configuredRows[index];
+
+        if (existing) {
+          return {
+            ...existing,
+            swCtrl: existing.swCtrl || configured?.swCtrl || String(index + 1),
+            hardwareVersion: existing.hardwareVersion || configured?.hardwareVersion || '',
+            ontType: existing.ontType || configured?.ontType || '',
+            softwareVersionFileId:
+              existing.softwareVersionFileId || configured?.softwareVersionFileId || '',
+            configFileId: existing.configFileId || configured?.configFileId || '',
+          };
+        }
+
+        if (configured) {
+          return configured;
+        }
+
+        return createSoftwareControlMatrixRow(index);
+      });
+    });
+  }, [ontFileByName, settingsSoftwareControlMatrix]);
 
   const updatePonSlot = (
     slotNumber: number,
@@ -529,6 +745,34 @@ const OltSettings: React.FC = () => {
     );
   };
 
+  const updateSoftwareControlMatrixRow = (
+    rowId: string,
+    changes: Partial<Omit<SoftwareControlMatrixRow, 'rowId'>>
+  ) => {
+    setHasUnsavedChanges(true);
+    setSoftwareControlMatrixRows((current) =>
+      current.map((row) => (row.rowId === rowId ? { ...row, ...changes } : row))
+    );
+  };
+
+  const handleAddSoftwareControlMatrixRow = () => {
+    setHasUnsavedChanges(true);
+    setSoftwareControlMatrixRows((current) => [
+      ...current,
+      createSoftwareControlMatrixRow(current.length),
+    ]);
+  };
+
+  const handleRemoveSoftwareControlMatrixRow = (rowId: string) => {
+    setHasUnsavedChanges(true);
+    setSoftwareControlMatrixRows((current) => {
+      if (current.length <= SOFTWARE_CONTROL_MATRIX_MIN_ROWS) {
+        return current;
+      }
+      return current.filter((row) => row.rowId !== rowId);
+    });
+  };
+
   const currentSettingsElements = useMemo(
     () => ({
       linecards: ponSlots
@@ -547,19 +791,22 @@ const OltSettings: React.FC = () => {
       uplinks: uplinkSlots
         .filter((slot) => slot.uplinkCardModelId)
         .map((slot) => {
-          const selectedSwitch = switchById.get(slot.switchId);
+          const selectedDevice = uplinkDeviceById.get(String(slot.switchId));
+          const slotName = getUplinkSlotName(slot.slotNumber);
           return {
-            name: `uplink${slot.slotNumber}`,
+            name: slotName,
+            slot_name: slotName,
             olt_uplink_card_model_code:
               (uplinkCardModelsData?.data || []).find(
                 (model: any) => model.id === slot.uplinkCardModelId
               )?.code || '',
             configuration: {
-              uplink_device_type: 'switch',
+              uplink_device_type: selectedDevice?.type === 'switch' ? 'switch' : 'olt',
               uplink_device_id: slot.switchId || '',
-              uplink_interface_name: selectedSwitch?.name || '',
-              ip_address: slot.switchIpAddress,
-              olt_port: slot.oltPort,
+              uplink_interface_name: selectedDevice?.name || '',
+              ptp_network: slot.ptpNetwork,
+              lag: slot.lag,
+              uplink_port: slot.uplinkPorts.map((portName) => `${slotName}:${portName}`),
               switch_port: slot.switchPort,
             },
           };
@@ -584,14 +831,34 @@ const OltSettings: React.FC = () => {
             },
           };
         }),
+      ont_sw_ctrl_matrix: softwareControlMatrixRows
+        .filter(
+          (row) =>
+            row.hardwareVersion ||
+            row.ontType ||
+            row.softwareVersionFileId ||
+            row.configFileId
+        )
+        .map((row, index) => ({
+          sw_ctrl: row.swCtrl ? Number(row.swCtrl) : index + 1,
+          hw_version: row.hardwareVersion || null,
+          ont_type: row.ontType || null,
+          sw_version: ontFileById.get(String(row.softwareVersionFileId || ''))?.name || null,
+          cfg_file: row.configFileId
+            ? ontFileById.get(String(row.configFileId || ''))?.name || null
+            : null,
+        })),
     }),
     [
       bngModelById,
       bngSlots,
       bngsData,
+      getUplinkSlotName,
       lineCardModelById,
+      ontFileById,
       ponSlots,
-      switchById,
+      softwareControlMatrixRows,
+      uplinkDeviceById,
       uplinkCardModelsData,
       uplinkSlots,
     ]
@@ -606,12 +873,13 @@ const OltSettings: React.FC = () => {
       return;
     }
 
-    const expectedPonSlots = Number(oltModel.number_of_pon_slots || 0);
-    const expectedUplinkSlots = Number(oltModel.number_of_uplink_slots || 0);
+    const expectedPonSlots = Number(oltModel.number_of_line_card_slots || 0);
+    const expectedUplinkSlots = Number(oltModel.number_of_uplink_card_slots || 0);
     if (
       ponSlots.length !== expectedPonSlots ||
       uplinkSlots.length !== expectedUplinkSlots ||
-      bngSlots.length !== 2
+      bngSlots.length !== 2 ||
+      softwareControlMatrixRows.length < SOFTWARE_CONTROL_MATRIX_MIN_ROWS
     ) {
       return;
     }
@@ -619,7 +887,8 @@ const OltSettings: React.FC = () => {
     const hasAnyExisting =
       settingsLinecards.length > 0 ||
       settingsUplinks.length > 0 ||
-      (((settingsElements.bng as any[]) || []).length > 0);
+      (((settingsElements.bng as any[]) || []).length > 0) ||
+      settingsSoftwareControlMatrix.length > 0;
 
     setHasSavedSettings(hasAnyExisting);
     setHasUnsavedChanges(false);
@@ -629,7 +898,9 @@ const OltSettings: React.FC = () => {
     ponSlots.length,
     settingsElements,
     settingsLinecards.length,
+    settingsSoftwareControlMatrix.length,
     settingsUplinks.length,
+    softwareControlMatrixRows.length,
     uplinkSlots.length,
   ]);
 
@@ -662,13 +933,15 @@ const OltSettings: React.FC = () => {
       return;
     }
 
-    const expectedPonSlots = Number(oltModel?.number_of_pon_slots || 0);
-    const expectedUplinkSlots = Number(oltModel?.number_of_uplink_slots || 0);
+    const expectedPonSlots = Number(oltModel?.number_of_line_card_slots || 0);
+    const expectedUplinkSlots = Number(oltModel?.number_of_uplink_card_slots || 0);
     const isPonReady = ponSlots.length === expectedPonSlots;
     const isUplinkReady = uplinkSlots.length === expectedUplinkSlots;
     const isBngReady = bngSlots.length === 2;
+    const isSoftwareControlMatrixReady =
+      softwareControlMatrixRows.length >= SOFTWARE_CONTROL_MATRIX_MIN_ROWS;
 
-    if (!isPonReady || !isUplinkReady || !isBngReady) {
+    if (!isPonReady || !isUplinkReady || !isBngReady || !isSoftwareControlMatrixReady) {
       return;
     }
 
@@ -715,15 +988,20 @@ const OltSettings: React.FC = () => {
 
     setUplinkSlots((current) =>
       current.map((slot) => {
-        const existingSlot = existingUplinkByName.get(`uplink${slot.slotNumber}`);
+        const existingSlot = existingUplinkByName.get(getUplinkSlotName(slot.slotNumber));
         if (!existingSlot) {
           return slot;
         }
 
-        const configuredSwitchId = existingSlot.configuration?.uplink_device_id || '';
-        const configuredSwitch =
-          switchById.get(configuredSwitchId) ||
-          switchByName.get(existingSlot.configuration?.uplink_device_name || '');
+        const configuredDeviceId = existingSlot.configuration?.uplink_device_id || '';
+        const configuredDeviceType = String(existingSlot.configuration?.uplink_device_type || '').toLowerCase();
+        const configuredDeviceName =
+          existingSlot.configuration?.uplink_device_name || existingSlot.configuration?.uplink_interface_name || '';
+        const configuredDevice =
+          (configuredDeviceType === 'olt'
+            ? oltById.get(String(configuredDeviceId)) || oltByName.get(configuredDeviceName)
+            : switchById.get(configuredDeviceId) || switchByName.get(configuredDeviceName)) ||
+          uplinkDeviceById.get(String(configuredDeviceId));
 
         return {
           ...slot,
@@ -731,10 +1009,18 @@ const OltSettings: React.FC = () => {
             uplinkCardModelByCode.get(existingSlot.olt_uplink_card_model_code || '')?.id ||
             existingSlot.olt_uplink_card_model_id ||
             '',
-          switchId: configuredSwitchId || configuredSwitch?.id || '',
+          switchId: configuredDeviceId || configuredDevice?.id || '',
           switchPort: existingSlot.configuration?.switch_port || '',
-          switchIpAddress: existingSlot.configuration?.ip_address || '',
-          oltPort: existingSlot.configuration?.olt_port || '',
+          ptpNetwork: existingSlot.configuration?.ptp_network || existingSlot.configuration?.ip_address || '',
+          lag: Boolean(existingSlot.configuration?.lag),
+          uplinkPorts: Array.isArray(existingSlot.configuration?.uplink_port)
+            ? existingSlot.configuration.uplink_port
+                .map((value: any) => String(value))
+                .filter(Boolean)
+                .map((value: string) => value.split(':').slice(1).join(':') || value)
+            : existingSlot.configuration?.olt_port
+              ? [String(existingSlot.configuration.olt_port)]
+              : [],
         };
       })
     );
@@ -764,15 +1050,22 @@ const OltSettings: React.FC = () => {
     bngsData,
     lineCardModelByCode,
     lineCardModelsData,
-    oltModel?.number_of_pon_slots,
-    oltModel?.number_of_uplink_slots,
+    getUplinkSlotName,
+    oltById,
+    oltByName,
+    oltModel?.number_of_line_card_slots,
+    oltModel?.number_of_uplink_card_slots,
+    uplinkSlotNames,
     settingsElements,
     settingsLinecards,
+    settingsSoftwareControlMatrix,
     settingsUplinks,
     ponSlots.length,
+    softwareControlMatrixRows.length,
     switchById,
     switchByName,
     switchesData,
+    uplinkDeviceById,
     uplinkCardModelByCode,
     uplinkCardModelsData,
     uplinkSlots.length,
@@ -790,7 +1083,8 @@ const OltSettings: React.FC = () => {
       setHasSavedSettings(
         payload.elements.linecards.length > 0 ||
           payload.elements.uplinks.length > 0 ||
-          payload.elements.bng.length > 0
+          payload.elements.bng.length > 0 ||
+          payload.elements.ont_sw_ctrl_matrix.length > 0
       );
       setHasUnsavedChanges(false);
     } catch (error: any) {
@@ -810,8 +1104,10 @@ const OltSettings: React.FC = () => {
     isLineCardModelsLoading ||
     isUplinkCardModelsLoading ||
     isSwitchesLoading ||
+    isOltsLoading ||
     isBngsLoading ||
-    isBngModelsLoading
+    isBngModelsLoading ||
+    isOntFilesLoading
   ) {
     return (
       <Layout title="OLT Settings">
@@ -990,11 +1286,11 @@ const OltSettings: React.FC = () => {
 
         <Paper sx={{ px: 2, pt: 1, pb: 2 }}>
           <Typography variant="subtitle1" sx={{ mb: 0.75, fontWeight: 700 }}>
-            Uplink
+            Uplink Cards
           </Typography>
           {uplinkSlots.length === 0 && (
             <Alert severity="info">
-              No uplink slots found in current OLT settings.
+              No uplink slots are defined for the selected OLT model.
             </Alert>
           )}
           {uplinkSlots.length > 0 && (
@@ -1004,12 +1300,12 @@ const OltSettings: React.FC = () => {
                 mb: 0.5,
                 display: { xs: 'none', md: 'grid' },
                 gridTemplateColumns:
-                  '64px minmax(170px, 1fr) minmax(170px, 1fr) 110px 140px 100px',
+                  '64px minmax(170px, 1fr) minmax(170px, 1fr) 110px 140px 88px minmax(220px, 1.3fr)',
                 gap: 1.25,
                 alignItems: 'center',
               }}
             >
-              {['Slot', 'Uplink Card', 'Uplink Device', 'Switch Port', 'Switch IP', 'OLT Port'].map(
+              {['Name', 'Uplink Card', 'Uplink Device', 'Switch Port', 'ptp network', 'LAG', 'Uplink Ports'].map(
                 (label) => (
                   <Typography
                     key={label}
@@ -1037,14 +1333,14 @@ const OltSettings: React.FC = () => {
                 display: 'grid',
                 gridTemplateColumns: {
                   xs: '1fr',
-                  md: '64px minmax(170px, 1fr) minmax(170px, 1fr) 110px 140px 100px',
+                  md: '64px minmax(170px, 1fr) minmax(170px, 1fr) 110px 140px 88px minmax(220px, 1.3fr)',
                 },
                 gap: 1.25,
                 alignItems: 'center',
               }}
             >
               <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                {slot.slotNumber}
+                {getUplinkSlotName(slot.slotNumber)}
               </Typography>
               <TextField
                 select
@@ -1055,6 +1351,8 @@ const OltSettings: React.FC = () => {
                 onChange={(event) =>
                   updateUplinkSlot(slot.slotNumber, {
                     uplinkCardModelId: event.target.value,
+                    uplinkPorts: [],
+                    lag: false,
                   })
                 }
               >
@@ -1072,18 +1370,16 @@ const OltSettings: React.FC = () => {
                 sx={compactFieldSx}
                 value={slot.switchId}
                 onChange={(event) => {
-                  const selectedSwitchId = event.target.value;
-                  const selectedSwitch = switchById.get(selectedSwitchId);
+                  const selectedDeviceId = event.target.value;
                   updateUplinkSlot(slot.slotNumber, {
-                    switchId: selectedSwitchId,
-                    switchIpAddress: selectedSwitch?.ip_address_v4 || '',
+                    switchId: selectedDeviceId,
                   });
                 }}
               >
                 <MenuItem value="">N/A</MenuItem>
-                {switchesData?.data.map((item: any) => (
-                  <MenuItem key={item.id} value={item.id}>
-                    {item.name}
+                {availableUplinkDevices.map((item: any) => (
+                  <MenuItem key={`${item.type}-${item.id}`} value={item.id}>
+                    {item.name} ({item.type === 'switch' ? 'Switch' : 'OLT'})
                   </MenuItem>
                 ))}
               </TextField>
@@ -1100,20 +1396,93 @@ const OltSettings: React.FC = () => {
                 fullWidth
                 size="small"
                 sx={compactFieldSx}
-                value={slot.switchIpAddress}
-                InputProps={{
-                  readOnly: true,
-                }}
-              />
-              <TextField
-                fullWidth
-                size="small"
-                sx={compactFieldSx}
-                value={slot.oltPort}
+                value={slot.ptpNetwork}
                 onChange={(event) =>
-                  updateUplinkSlot(slot.slotNumber, { oltPort: event.target.value })
+                  updateUplinkSlot(slot.slotNumber, { ptpNetwork: event.target.value })
                 }
               />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    size="small"
+                    checked={slot.lag}
+                    onChange={(event) =>
+                      updateUplinkSlot(slot.slotNumber, {
+                        lag: event.target.checked,
+                        uplinkPorts: event.target.checked
+                          ? slot.uplinkPorts
+                          : slot.uplinkPorts.slice(0, 1),
+                      })
+                    }
+                  />
+                }
+                label=""
+                sx={{ m: 0, justifyContent: 'center' }}
+              />
+              <Box
+                sx={{
+                  minHeight: 42,
+                  px: 0.75,
+                  py: 0.5,
+                  border: 1,
+                  borderColor: 'text.primary',
+                  borderRadius: 1,
+                  bgcolor: '#bdbdbd',
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: 0.75,
+                  alignItems: 'center',
+                }}
+              >
+                {getAvailableUplinkPortNames(slot.uplinkCardModelId).length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    N/A
+                  </Typography>
+                ) : (
+                  getAvailableUplinkPortNames(slot.uplinkCardModelId).map((portName) => {
+                    const isSelected = slot.uplinkPorts.includes(portName);
+                    return (
+                      <Button
+                        key={portName}
+                        size="small"
+                        variant="contained"
+                        disableElevation
+                        onClick={() => {
+                          if (slot.lag) {
+                            const nextPorts = isSelected
+                              ? slot.uplinkPorts.filter((value) => value !== portName)
+                              : [...slot.uplinkPorts, portName];
+                            updateUplinkSlot(slot.slotNumber, { uplinkPorts: nextPorts });
+                            return;
+                          }
+
+                          updateUplinkSlot(slot.slotNumber, {
+                            uplinkPorts: isSelected ? [] : [portName],
+                          });
+                        }}
+                        sx={{
+                          minWidth: 0,
+                          px: 1.25,
+                          py: 0.35,
+                          borderRadius: 1,
+                          lineHeight: 1,
+                          fontSize: '0.8rem',
+                          textTransform: 'none',
+                          border: 1,
+                          borderColor: 'text.primary',
+                          bgcolor: isSelected ? 'primary.main' : 'background.paper',
+                          color: isSelected ? 'common.white' : 'text.primary',
+                          '&:hover': {
+                            bgcolor: isSelected ? 'primary.dark' : 'grey.50',
+                          },
+                        }}
+                      >
+                        {portName}
+                      </Button>
+                    );
+                  })
+                )}
+              </Box>
             </Box>
           ))}
         </Paper>
@@ -1132,9 +1501,9 @@ const OltSettings: React.FC = () => {
               alignItems: 'center',
             }}
           >
-            {['Slot', 'BNG', 'Primary', 'Priority'].map((label) => (
+            {['', 'BNG', 'Primary', 'Priority'].map((label, index) => (
               <Typography
-                key={label}
+                key={`${label}-${index}`}
                 variant="caption"
                 color="text.secondary"
                 sx={{ fontWeight: 700 }}
@@ -1208,6 +1577,167 @@ const OltSettings: React.FC = () => {
             </Box>
           ))}
         </Paper>
+
+        <Paper sx={{ px: 2, pt: 1, pb: 2 }}>
+          <Box
+            sx={{
+              mb: 0.75,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 2,
+            }}
+          >
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+              ONT Software Control Matrix
+            </Typography>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={<MaterialSymbol name="add" />}
+              onClick={handleAddSoftwareControlMatrixRow}
+            >
+              Add Row
+            </Button>
+          </Box>
+          <Box
+            sx={{
+              px: 1.25,
+              mb: 0.5,
+              display: { xs: 'none', md: 'grid' },
+              gridTemplateColumns:
+                '88px minmax(170px, 1fr) 120px minmax(220px, 1fr) minmax(220px, 1fr) 56px',
+              gap: 1.25,
+              alignItems: 'center',
+            }}
+          >
+            {['Sw Ctrl', 'Hardware Version', 'Ont Type', 'Software Version File', 'Config File', ''].map(
+              (label, index) => (
+                <Typography
+                  key={`${label}-${index}`}
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ fontWeight: 700 }}
+                >
+                  {label}
+                </Typography>
+              )
+            )}
+          </Box>
+          {softwareControlMatrixRows.map((row, index) => (
+            <Box
+              key={row.rowId}
+              sx={{
+                border: 1,
+                borderColor: 'divider',
+                bgcolor: 'grey.100',
+                borderRadius: 1,
+                px: 1.25,
+                py: 0.5,
+                mb: 0.75,
+                display: 'grid',
+                gridTemplateColumns: {
+                  xs: '1fr',
+                  md: '88px minmax(170px, 1fr) 120px minmax(220px, 1fr) minmax(220px, 1fr) 56px',
+                },
+                gap: 1.25,
+                alignItems: 'center',
+              }}
+            >
+              <TextField
+                fullWidth
+                size="small"
+                sx={compactFieldSx}
+                type="number"
+                value={row.swCtrl}
+                inputProps={{ min: 1, step: 1 }}
+                onChange={(event) =>
+                  updateSoftwareControlMatrixRow(row.rowId, {
+                    swCtrl: event.target.value,
+                  })
+                }
+              />
+              <TextField
+                fullWidth
+                size="small"
+                sx={compactFieldSx}
+                value={row.hardwareVersion}
+                onChange={(event) =>
+                  updateSoftwareControlMatrixRow(row.rowId, {
+                    hardwareVersion: event.target.value,
+                  })
+                }
+              />
+              <TextField
+                select
+                fullWidth
+                size="small"
+                sx={compactFieldSx}
+                value={row.ontType}
+                onChange={(event) =>
+                  updateSoftwareControlMatrixRow(row.rowId, {
+                    ontType: event.target.value,
+                  })
+                }
+              >
+                <MenuItem value="">N/A</MenuItem>
+                {ONT_TYPE_OPTIONS.map((value) => (
+                  <MenuItem key={value} value={value}>
+                    {value}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                sx={compactFieldSx}
+                value={row.softwareVersionFileId}
+                onChange={(event) =>
+                  updateSoftwareControlMatrixRow(row.rowId, {
+                    softwareVersionFileId: event.target.value,
+                  })
+                }
+              >
+                <MenuItem value="">N/A</MenuItem>
+                {softwareVersionFileOptions.map((file: any) => (
+                  <MenuItem key={file.id} value={file.id}>
+                    {file.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                select
+                fullWidth
+                size="small"
+                sx={compactFieldSx}
+                value={row.configFileId}
+                onChange={(event) =>
+                  updateSoftwareControlMatrixRow(row.rowId, {
+                    configFileId: event.target.value,
+                  })
+                }
+              >
+                <MenuItem value="">N/A</MenuItem>
+                {configFileOptions.map((file: any) => (
+                  <MenuItem key={file.id} value={file.id}>
+                    {file.name}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Button
+                color="error"
+                size="small"
+                variant="text"
+                disabled={softwareControlMatrixRows.length <= SOFTWARE_CONTROL_MATRIX_MIN_ROWS}
+                onClick={() => handleRemoveSoftwareControlMatrixRow(row.rowId)}
+                sx={{ minWidth: 0, p: 0.5 }}
+              >
+                <MaterialSymbol name="delete" />
+              </Button>
+            </Box>
+          ))}
+        </Paper>
       </Box>
 
       <Dialog
@@ -1219,7 +1749,7 @@ const OltSettings: React.FC = () => {
         <DialogTitle>Save OLT Settings</DialogTitle>
         <DialogContent>
           <Typography variant="body2" color="text.secondary">
-            Confirm saving the current PON, uplink, and BNG settings for this OLT.
+            Confirm saving the current PON, uplink, BNG, and software control matrix settings for this OLT.
           </Typography>
         </DialogContent>
         <DialogActions>

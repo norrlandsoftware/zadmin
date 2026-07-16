@@ -17,6 +17,7 @@ import {
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import { FormDialogGrid, FormDialogItem, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import {
   bngModels,
   oltLineCardModels,
@@ -83,8 +84,9 @@ const deviceModelConfigs: Record<string, DeviceModelConfig> = {
       { name: 'number_of_pon_ports', label: 'PON Ports', type: 'number' },
       { name: 'number_of_xgspon_ports', label: 'XGSPON Ports', type: 'number' },
       { name: 'number_of_uplink_ports', label: 'Uplink Ports', type: 'number' },
-      { name: 'number_of_pon_slots', label: 'PON Slots', type: 'number' },
-      { name: 'number_of_uplink_slots', label: 'Uplink Slots', type: 'number' },
+      { name: 'number_of_line_card_slots', label: 'Line Card Slots', type: 'number' },
+      { name: 'number_of_uplink_card_slots', label: 'Uplink Card Slots', type: 'number' },
+      { name: 'uplink_line_card_slots_name', label: 'Uplink Slot Names', type: 'text' },
       { name: 'description', label: 'Description', type: 'textarea' },
     ],
     columns: [
@@ -92,7 +94,8 @@ const deviceModelConfigs: Record<string, DeviceModelConfig> = {
       { id: 'vendor', label: 'Vendor' },
       { id: 'modular', label: 'Modular', format: formatBoolean },
       { id: 'number_of_pon_ports', label: 'PON Ports', format: formatOptional },
-      { id: 'number_of_pon_slots', label: 'PON Slots', format: formatOptional },
+      { id: 'number_of_line_card_slots', label: 'Line Card Slots', format: formatOptional },
+      { id: 'number_of_uplink_card_slots', label: 'Uplink Card Slots', format: formatOptional },
       { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
     ],
   },
@@ -126,12 +129,15 @@ const deviceModelConfigs: Record<string, DeviceModelConfig> = {
     api: oltUplinkCardModels,
     fields: [
       ...commonFields.slice(0, 2),
+      { name: 'number_of_uplink_port', label: 'Uplink Ports', type: 'number' },
+      { name: 'uplink_port_names', label: 'Uplink Port Names', type: 'text' },
       { name: 'olt_model_ids', label: 'Compatible OLT Models', type: 'olt-model-multi-select' },
       commonFields[2],
     ],
     columns: [
       { id: 'name', label: 'Name' },
       { id: 'vendor', label: 'Vendor' },
+      { id: 'number_of_uplink_port', label: 'Uplink Ports', format: formatOptional },
       { id: 'description', label: 'Description', format: formatOptional },
       { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
     ],
@@ -284,15 +290,21 @@ const DeviceModels: React.FC = () => {
       if ('number_of_pon_ports' in details) ports.pon_ports = details.number_of_pon_ports;
       if ('number_of_xgspon_ports' in details) ports.xgspon_ports = details.number_of_xgspon_ports;
       if ('number_of_uplink_ports' in details) ports.uplink_ports = details.number_of_uplink_ports;
-      if ('number_of_pon_slots' in details) slots.pon_slots = details.number_of_pon_slots;
-      if ('number_of_uplink_slots' in details) slots.uplink_slots = details.number_of_uplink_slots;
+      if ('number_of_line_card_slots' in details) slots.line_card_slots = details.number_of_line_card_slots;
+      if ('number_of_uplink_card_slots' in details) slots.uplink_card_slots = details.number_of_uplink_card_slots;
+      if ('uplink_line_card_slots_name' in details) {
+        slots.uplink_slot_names = Array.isArray(details.uplink_line_card_slots_name)
+          ? details.uplink_line_card_slots_name.join(', ')
+          : details.uplink_line_card_slots_name;
+      }
 
       delete details.compatible_olt_models;
       delete details.number_of_pon_ports;
       delete details.number_of_xgspon_ports;
       delete details.number_of_uplink_ports;
-      delete details.number_of_pon_slots;
-      delete details.number_of_uplink_slots;
+      delete details.number_of_line_card_slots;
+      delete details.number_of_uplink_card_slots;
+      delete details.uplink_line_card_slots_name;
 
       details.ports = ports;
       details.slots = slots;
@@ -311,6 +323,10 @@ const DeviceModels: React.FC = () => {
           : ['All OLT models supported'];
 
       details.supported_olt_model_codes = supportedCodes.join(', ');
+    }
+
+    if (modelType === 'olt-uplink-card' && Array.isArray(details.uplink_port_names)) {
+      details.uplink_port_names = details.uplink_port_names.join(', ');
     }
 
     if (modelType === 'olt-line-card' || modelType === 'olt-uplink-card' || modelType === 'bng') {
@@ -381,25 +397,26 @@ const DeviceModels: React.FC = () => {
 
   const renderField = (field: DeviceModelField, index: number) => {
     const defaultValue = editingModel?.[field.name];
+    const fullWidth = field.type === 'textarea' || field.type === 'olt-model-multi-select';
 
     if (field.type === 'boolean') {
       return (
-        <TextField
-          key={field.name}
-          select
-          margin="dense"
-          name={field.name}
-          label={field.label}
-          fullWidth
-          defaultValue={
-            defaultValue === true ? 'true' : defaultValue === false ? 'false' : ''
-          }
-          required={field.required}
-        >
-          <MenuItem value="">N/A</MenuItem>
-          <MenuItem value="true">Yes</MenuItem>
-          <MenuItem value="false">No</MenuItem>
-        </TextField>
+        <FormDialogItem key={field.name} fullWidth={fullWidth}>
+          <TextField
+            select
+            name={field.name}
+            label={field.label}
+            fullWidth
+            defaultValue={
+              defaultValue === true ? 'true' : defaultValue === false ? 'false' : ''
+            }
+            required={field.required}
+          >
+            <MenuItem value="">N/A</MenuItem>
+            <MenuItem value="true">Yes</MenuItem>
+            <MenuItem value="false">No</MenuItem>
+          </TextField>
+        </FormDialogItem>
       );
     }
 
@@ -407,45 +424,45 @@ const DeviceModels: React.FC = () => {
       const selectedValues = Array.isArray(defaultValue) ? defaultValue : [];
 
       return (
-        <TextField
-          key={field.name}
-          select
-          margin="dense"
-          name={field.name}
-          label={field.label}
-          fullWidth
-          defaultValue={selectedValues}
-          SelectProps={{
-            multiple: true,
-            renderValue: (selected) =>
-              formatOltModelIds(Array.isArray(selected) ? selected : []),
-          }}
-          helperText="Leave empty to allow all OLT models."
-        >
-          {(oltModelsData?.data || []).map((model: any) => (
-            <MenuItem key={model.id} value={model.id}>
-              <ListItemText primary={model.name} secondary={model.vendor} />
-            </MenuItem>
-          ))}
-        </TextField>
+        <FormDialogItem key={field.name} fullWidth={fullWidth}>
+          <TextField
+            select
+            name={field.name}
+            label={field.label}
+            fullWidth
+            defaultValue={selectedValues}
+            SelectProps={{
+              multiple: true,
+              renderValue: (selected) =>
+                formatOltModelIds(Array.isArray(selected) ? selected : []),
+            }}
+            helperText="Leave empty to allow all OLT models."
+          >
+            {(oltModelsData?.data || []).map((model: any) => (
+              <MenuItem key={model.id} value={model.id}>
+                <ListItemText primary={model.name} secondary={model.vendor} />
+              </MenuItem>
+            ))}
+          </TextField>
+        </FormDialogItem>
       );
     }
 
     return (
-      <TextField
-        key={field.name}
-        autoFocus={index === 0}
-        margin="dense"
-        name={field.name}
-        label={field.label}
-        type={field.type === 'number' ? 'number' : 'text'}
-        fullWidth
-        multiline={field.type === 'textarea'}
-        rows={field.type === 'textarea' ? 3 : undefined}
-        defaultValue={defaultValue ?? ''}
-        required={field.required}
-        inputProps={field.type === 'number' ? { min: 0, step: 1 } : undefined}
-      />
+      <FormDialogItem key={field.name} fullWidth={fullWidth}>
+        <TextField
+          autoFocus={index === 0}
+          name={field.name}
+          label={field.label}
+          type={field.type === 'number' ? 'number' : 'text'}
+          fullWidth
+          multiline={field.type === 'textarea'}
+          rows={field.type === 'textarea' ? 3 : undefined}
+          defaultValue={defaultValue ?? ''}
+          required={field.required}
+          inputProps={field.type === 'number' ? { min: 0, step: 1 } : undefined}
+        />
+      </FormDialogItem>
     );
   };
 
@@ -483,20 +500,22 @@ const DeviceModels: React.FC = () => {
         onEdit={config.allowEdit === false ? undefined : handleEdit}
       />
 
-      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="sm" fullWidth>
+      <Dialog open={dialogOpen} onClose={handleClose} maxWidth="md" fullWidth PaperProps={{ sx: formDialogPaperSx }}>
         <form onSubmit={handleSave}>
-          <DialogTitle>
+          <DialogTitle sx={formDialogTitleSx}>
             {editingModel ? `Edit ${config.singular}` : `Create New ${config.singular}`}
           </DialogTitle>
-          <DialogContent>
+          <DialogContent sx={formDialogContentSx}>
             {formError && (
               <Alert severity="error" sx={{ mb: 2, mt: 1 }}>
                 {formError}
               </Alert>
             )}
-            {config.fields.map(renderField)}
+            <FormDialogGrid>
+              {config.fields.map(renderField)}
+            </FormDialogGrid>
           </DialogContent>
-          <DialogActions>
+          <DialogActions sx={formDialogActionsSx}>
             <Button onClick={handleClose}>Cancel</Button>
             <Button type="submit" variant="contained" color="primary">
               Save
