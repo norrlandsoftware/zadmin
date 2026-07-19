@@ -13,6 +13,7 @@ import {
   TextField,
   CircularProgress,
   MenuItem,
+  Switch,
   InputAdornment,
   IconButton,
   Divider,
@@ -280,6 +281,7 @@ const Onts: React.FC = () => {
       retry: false,
     }
   );
+  const videoServiceStatus = getVideoServiceStatus(videoServiceData);
 
   const ontDetailData = viewingOnt
     ? {
@@ -301,7 +303,7 @@ const Onts: React.FC = () => {
                 ? 'Loading…'
                 : isVideoServiceError
                   ? 'Unable to load status'
-                  : getVideoServiceStatus(videoServiceData) || 'Unavailable',
+                  : videoServiceStatus || 'Unavailable',
             }
           : {}),
         error_code: viewingOnt.error_code,
@@ -338,7 +340,7 @@ const Onts: React.FC = () => {
   };
 
   const handleVideoServiceToggle = async () => {
-    const currentStatus = getVideoServiceStatus(videoServiceData);
+    const currentStatus = videoServiceStatus;
     if (!viewingOnt?.id || !currentStatus || isUpdatingVideoService) {
       return;
     }
@@ -622,32 +624,48 @@ const Onts: React.FC = () => {
           },
         ]}
         fieldValueStyles={
-          isFullyConfiguredOnt
+          {
+            ...(isFullyConfiguredOnt
+              ? {
+                  admin_status: {
+                    color: 'white', backgroundColor: 'green', px: 1, py: 0.25, borderRadius: '999px', display: 'inline-block',
+                  },
+                  operational_status: {
+                    color: 'white', backgroundColor: 'green', px: 1, py: 0.25, borderRadius: '999px', display: 'inline-block',
+                  },
+                  notified_to_bss: {
+                    color: 'white', backgroundColor: 'green', px: 1, py: 0.25, borderRadius: '999px', display: 'inline-block',
+                  },
+                }
+              : {}),
+            ...(videoServiceStatus
+              ? {
+                  video_service: {
+                    color: 'white',
+                    backgroundColor: videoServiceStatus === 'enabled' ? 'green' : '#f6a400',
+                    px: 1,
+                    py: 0.25,
+                    borderRadius: '999px',
+                    display: 'inline-block',
+                  },
+                }
+              : {}),
+          }
+        }
+        fieldControls={
+          isCatvOnt
             ? {
-                admin_status: {
-                  color: 'white',
-                  backgroundColor: 'green',
-                  px: 1,
-                  py: 0.25,
-                  borderRadius: '999px',
-                  display: 'inline-block',
-                },
-                operational_status: {
-                  color: 'white',
-                  backgroundColor: 'green',
-                  px: 1,
-                  py: 0.25,
-                  borderRadius: '999px',
-                  display: 'inline-block',
-                },
-                notified_to_bss: {
-                  color: 'white',
-                  backgroundColor: 'green',
-                  px: 1,
-                  py: 0.25,
-                  borderRadius: '999px',
-                  display: 'inline-block',
-                },
+                video_service: (
+                  <Switch
+                    size="small"
+                    checked={videoServiceStatus === 'enabled'}
+                    disabled={!videoServiceStatus || isUpdatingVideoService}
+                    inputProps={{
+                      'aria-label': `Set video service to ${videoServiceStatus === 'enabled' ? 'disabled' : 'enabled'}`,
+                    }}
+                    onChange={handleVideoServiceToggle}
+                  />
+                ),
               }
             : undefined
         }
@@ -664,17 +682,6 @@ const Onts: React.FC = () => {
                     });
                   },
                 } }
-              : {}),
-            ...(isCatvOnt && getVideoServiceStatus(videoServiceData)
-              ? {
-                  video_service: {
-                    icon: isUpdatingVideoService
-                      ? <CircularProgress size={16} />
-                      : <MaterialSymbol name="power_settings_new" fontSize="small" />,
-                    label: `Set video service to ${getVideoServiceStatus(videoServiceData) === 'enabled' ? 'disabled' : 'enabled'}`,
-                    onClick: handleVideoServiceToggle,
-                  },
-                }
               : {}),
           }
         }

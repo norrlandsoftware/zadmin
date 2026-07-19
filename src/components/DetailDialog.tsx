@@ -41,6 +41,7 @@ interface DetailDialogProps {
   preformattedFields?: string[];
   sections?: DetailDialogSection[];
   fieldValueStyles?: Record<string, any>;
+  fieldControls?: Record<string, React.ReactNode>;
 }
 
 const FIELD_LABEL_SX = {
@@ -77,6 +78,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   preformattedFields = [],
   sections,
   fieldValueStyles,
+  fieldControls,
 }) => {
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const [showUsername, setShowUsername] = useState(false);
@@ -357,18 +359,21 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
             {fieldActions[key].icon}
           </IconButton>
         )}
-        <Typography
-          variant="body2"
-          sx={{
-            wordBreak: 'break-word',
-            color: value ? 'text.primary' : 'text.disabled',
-            fontSize: '0.82rem',
-            lineHeight: 1.35,
-            ...fieldValueStyles?.[key],
-          }}
-        >
-          {formatValue(value)}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Typography
+            variant="body2"
+            sx={{
+              wordBreak: 'break-word',
+              color: value ? 'text.primary' : 'text.disabled',
+              fontSize: '0.82rem',
+              lineHeight: 1.35,
+              ...fieldValueStyles?.[key],
+            }}
+          >
+            {formatValue(value)}
+          </Typography>
+          {fieldControls?.[key]}
+        </Box>
       </Box>
     </Grid>
   );
