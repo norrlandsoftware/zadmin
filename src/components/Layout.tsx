@@ -23,11 +23,25 @@ const menuItemSx = {
   minHeight: 38,
   py: 0.25,
   px: 1.5,
+  '&.Mui-selected, &.Mui-selected:hover': {
+    bgcolor: '#bbdefb',
+    color: '#0d47a1',
+    '& .MuiListItemIcon-root': {
+      color: 'inherit',
+    },
+  },
 } as const;
 
 const nestedMenuItemSx = {
   minHeight: 34,
   py: 0.125,
+  '&.Mui-selected, &.Mui-selected:hover': {
+    bgcolor: '#bbdefb',
+    color: '#0d47a1',
+    '& .MuiListItemIcon-root': {
+      color: 'inherit',
+    },
+  },
 } as const;
 
 interface LayoutProps {
@@ -37,6 +51,10 @@ interface LayoutProps {
 
 const Layout: React.FC<LayoutProps> = ({ children, title }) => {
   const location = useLocation();
+  const isRouteActive = (path: string) =>
+    path === '/'
+      ? location.pathname === path
+      : location.pathname === path || location.pathname.startsWith(`${path}/`);
   const isDeviceModelsRoute = location.pathname.startsWith('/device-models');
   const [mobileOpen, setMobileOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(() => {
@@ -116,6 +134,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
           <ListItem
             button
             key={item.text}
+            selected={isRouteActive(item.path)}
             sx={menuItemSx}
             onClick={() => {
               navigate(item.path);
@@ -126,7 +145,12 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
             <ListItemText primary={item.text} primaryTypographyProps={{ fontSize: '0.9rem' }} />
           </ListItem>
         ))}
-        <ListItem button onClick={handleAdminToggle} sx={menuItemSx}>
+        <ListItem
+          button
+          onClick={handleAdminToggle}
+          selected={isDeviceModelsRoute || adminMenuItems.some((item) => isRouteActive(item.path))}
+          sx={menuItemSx}
+        >
           <ListItemIcon sx={{ color: 'primary.main', minWidth: 34 }}>
             <MaterialSymbol name="admin_panel_settings" />
           </ListItemIcon>
@@ -137,6 +161,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
           <List component="div" disablePadding sx={{ py: 0 }}>
             <ListItem
               button
+              selected={isRouteActive('/about')}
               sx={{ ...nestedMenuItemSx, pl: 3.5 }}
               onClick={() => {
                 navigate('/about');
@@ -151,7 +176,12 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
                 primaryTypographyProps={{ fontSize: '0.84rem' }}
               />
             </ListItem>
-            <ListItem button sx={{ ...nestedMenuItemSx, pl: 3.5 }} onClick={handleDeviceModelsToggle}>
+            <ListItem
+              button
+              selected={isDeviceModelsRoute}
+              sx={{ ...nestedMenuItemSx, pl: 3.5 }}
+              onClick={handleDeviceModelsToggle}
+            >
               <ListItemIcon sx={{ minWidth: 32, color: 'primary.main' }}>
                 <MaterialSymbol name="developer_board" />
               </ListItemIcon>
@@ -167,6 +197,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
                   <ListItem
                     button
                     key={item.text}
+                    selected={isRouteActive(item.path)}
                     sx={{ ...nestedMenuItemSx, pl: 6 }}
                     onClick={() => {
                       navigate(item.path);
@@ -187,6 +218,7 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
               <ListItem
                 button
                 key={item.text}
+                selected={isRouteActive(item.path)}
                 sx={{ ...nestedMenuItemSx, pl: 3.5 }}
                 onClick={() => {
                   navigate(item.path);
@@ -291,7 +323,9 @@ const Layout: React.FC<LayoutProps> = ({ children, title }) => {
         }}
       >
         <Toolbar />
-        {children}
+        <Box sx={{ maxWidth: 1440, mx: 'auto' }}>
+          {children}
+        </Box>
       </Box>
     </Box>
   );

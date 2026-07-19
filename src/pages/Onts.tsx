@@ -30,6 +30,7 @@ import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
 import { FormDialogGrid, FormDialogItem, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
+import { useResultBar } from '../contexts/ResultBarContext.tsx';
 import { onts, olts } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
@@ -170,6 +171,23 @@ const getMarginTickPosition = (tick: number) => {
 type ConfigurationFilter = 'fullyConfigured' | 'notFullyConfigured' | '';
 const FULLY_CONFIGURED_QUERY = 'admin_status:configure,operational_status:configured,notified_to_bss:true';
 
+const getVideoServiceStatus = (response: any): 'enabled' | 'disabled' | null => {
+  const status = response?.status ?? response?.data?.status;
+  const normalizedStatus = String(status || '').toLowerCase();
+  return normalizedStatus === 'enabled' || normalizedStatus === 'disabled'
+    ? normalizedStatus
+    : null;
+};
+
+const getErrorMessage = (error: any, fallback: string) => {
+  const message =
+    error?.response?.data?.detail?.[0]?.msg ||
+    error?.response?.data?.detail ||
+    error?.response?.data?.message;
+
+  return typeof message === 'string' ? message : fallback;
+};
+
 const Onts: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -192,7 +210,9 @@ const Onts: React.FC = () => {
   const [jsonDialogContent, setJsonDialogContent] = useState<any>(null);
   const [jsonDialogTitle, setJsonDialogTitle] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
+  const [isUpdatingVideoService, setIsUpdatingVideoService] = useState(false);
   const navigate = useNavigate();
+  const { pushResult } = useResultBar();
 
   // Debounce search input
   useEffect(() => {
@@ -241,6 +261,57 @@ const Onts: React.FC = () => {
 
   const { data: oltsData } = useQuery(['olts'], () => olts.getAll());
 
+  const isCatvOnt =
+    viewingOnt?.type === 'DO_CATV' || viewingOnt?.ont_type === 'DO_CATV';
+  const isFullyConfiguredOnt =
+    viewingOnt?.admin_status?.toLowerCase() === 'configure' &&
+    viewingOnt?.operational_status?.toLowerCase() === 'configured' &&
+    viewingOnt?.notified_to_bss === true;
+  const {
+    data: videoServiceData,
+    isLoading: isVideoServiceLoading,
+    isError: isVideoServiceError,
+    refetch: refetchVideoService,
+  } = useQuery(
+    ['ont-video-service', viewingOnt?.id],
+    () => onts.getVideoService(viewingOnt.id),
+    {
+      enabled: detailDialogOpen && isCatvOnt && Boolean(viewingOnt?.id),
+      retry: false,
+    }
+  );
+
+  const ontDetailData = viewingOnt
+    ? {
+        id: viewingOnt.id,
+        serial_number: viewingOnt.serial_number,
+        ont_type: viewingOnt.ont_type ?? viewingOnt.type,
+        vendor: viewingOnt.vendor,
+        model: viewingOnt.model,
+        olt_name: viewingOnt.olt_name,
+        pon_port: viewingOnt.pon_port ?? viewingOnt.port,
+        ont_port: viewingOnt.ont_port,
+        sap_id: viewingOnt.sap_id,
+        admin_status: viewingOnt.admin_status,
+        operational_status: viewingOnt.operational_status,
+        notified_to_bss: viewingOnt.notified_to_bss,
+        ...(isCatvOnt
+          ? {
+              video_service: isVideoServiceLoading
+                ? 'Loading…'
+                : isVideoServiceError
+                  ? 'Unable to load status'
+                  : getVideoServiceStatus(videoServiceData) || 'Unavailable',
+            }
+          : {}),
+        error_code: viewingOnt.error_code,
+        error_message: viewingOnt.error_message,
+        error_details: viewingOnt.error_details,
+        created_at: viewingOnt.created_at,
+        updated_at: viewingOnt.updated_at,
+      }
+    : null;
+
   const { data: troubleshootData, isLoading: troubleshootLoading, refetch: refetchTroubleshoots } = useQuery(
     ['troubleshoots', troubleshootingOnt?.serial_number],
     () => onts.getTroubleshoots(troubleshootingOnt?.serial_number),
@@ -264,6 +335,29 @@ const Onts: React.FC = () => {
     
     setViewingOnt(ontWithOltName);
     setDetailDialogOpen(true);
+  };
+
+  const handleVideoServiceToggle = async () => {
+    const currentStatus = getVideoServiceStatus(videoServiceData);
+    if (!viewingOnt?.id || !currentStatus || isUpdatingVideoService) {
+      return;
+    }
+
+    const nextStatus = currentStatus === 'enabled' ? 'disabled' : 'enabled';
+    setIsUpdatingVideoService(true);
+
+    try {
+      await onts.setVideoService(viewingOnt.id, nextStatus);
+      const refreshedVideoService = await refetchVideoService();
+      if (refreshedVideoService.isError) {
+        throw refreshedVideoService.error;
+      }
+      pushResult('success', `Video service ${nextStatus}.`);
+    } catch (error) {
+      pushResult('error', getErrorMessage(error, 'Unable to update the video service.'));
+    } finally {
+      setIsUpdatingVideoService(false);
+    }
   };
 
   const handleEdit = (ont: any) => {
@@ -503,11 +597,64 @@ const Onts: React.FC = () => {
         open={detailDialogOpen}
         onClose={() => setDetailDialogOpen(false)}
         title="ONT Details"
-        data={viewingOnt}
-        fieldActions={
-          viewingOnt?.olt_name && viewingOnt?.olt_name !== 'N/A'
+        data={ontDetailData}
+        sections={[
+          {
+            title: 'General',
+            fields: ['serial_number', 'ont_type', 'vendor', 'model', 'olt_name'],
+          },
+          {
+            title: 'PON',
+            fields: ['pon_port', 'ont_port', 'sap_id'],
+          },
+          {
+            title: 'Status',
+            fields: [
+              'admin_status',
+              'operational_status',
+              'notified_to_bss',
+              ...(isCatvOnt ? ['video_service'] : []),
+            ],
+          },
+          {
+            title: 'Errors',
+            fields: ['error_code', 'error_message', 'error_details'],
+          },
+        ]}
+        fieldValueStyles={
+          isFullyConfiguredOnt
             ? {
-                olt_name: {
+                admin_status: {
+                  color: 'white',
+                  backgroundColor: 'green',
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: '999px',
+                  display: 'inline-block',
+                },
+                operational_status: {
+                  color: 'white',
+                  backgroundColor: 'green',
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: '999px',
+                  display: 'inline-block',
+                },
+                notified_to_bss: {
+                  color: 'white',
+                  backgroundColor: 'green',
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: '999px',
+                  display: 'inline-block',
+                },
+              }
+            : undefined
+        }
+        fieldActions={
+          {
+            ...(viewingOnt?.olt_name && viewingOnt?.olt_name !== 'N/A'
+              ? { olt_name: {
                   icon: <MaterialSymbol name="open_in_new" fontSize="small" />,
                   label: 'Open OLT details',
                   onClick: () => {
@@ -516,9 +663,20 @@ const Onts: React.FC = () => {
                       state: { openOltId: data?.data.find((ont: any) => ont.id === viewingOnt.id)?.olt_id },
                     });
                   },
-                },
-              }
-            : undefined
+                } }
+              : {}),
+            ...(isCatvOnt && getVideoServiceStatus(videoServiceData)
+              ? {
+                  video_service: {
+                    icon: isUpdatingVideoService
+                      ? <CircularProgress size={16} />
+                      : <MaterialSymbol name="power_settings_new" fontSize="small" />,
+                    label: `Set video service to ${getVideoServiceStatus(videoServiceData) === 'enabled' ? 'disabled' : 'enabled'}`,
+                    onClick: handleVideoServiceToggle,
+                  },
+                }
+              : {}),
+          }
         }
       />
 

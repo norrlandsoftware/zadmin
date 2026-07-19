@@ -168,6 +168,14 @@ export const onts = {
     const response = await api.post(`/ont/troubleshoot/${ontSerialNumber}/`, {});
     return response.data;
   },
+  getVideoService: async (id: string) => {
+    const response = await api.get(`/ont/${id}/video`);
+    return response.data;
+  },
+  setVideoService: async (id: string, status: 'enabled' | 'disabled') => {
+    const response = await api.post(`/ont/${id}/video`, { status });
+    return response.data;
+  },
 };
 
 // User API

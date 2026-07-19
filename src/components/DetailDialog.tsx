@@ -23,6 +23,11 @@ interface DetailDialogFieldAction {
   onClick: () => void;
 }
 
+interface DetailDialogSection {
+  title: string;
+  fields: string[];
+}
+
 interface DetailDialogProps {
   open: boolean;
   onClose: () => void;
@@ -34,6 +39,8 @@ interface DetailDialogProps {
   fullWidthFields?: string[];
   htmlPreviewFields?: string[];
   preformattedFields?: string[];
+  sections?: DetailDialogSection[];
+  fieldValueStyles?: Record<string, any>;
 }
 
 const FIELD_LABEL_SX = {
@@ -68,6 +75,8 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   fullWidthFields = [],
   htmlPreviewFields = [],
   preformattedFields = [],
+  sections,
+  fieldValueStyles,
 }) => {
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const [showUsername, setShowUsername] = useState(false);
@@ -95,6 +104,15 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   const formatLabel = (key: string): string => {
     if (key === 'compatible_olt_models_section') return 'Compatible OLT Models';
     if (key === 'supported_olt_model_codes') return 'Supported OLT Model Codes';
+    const labels: Record<string, string> = {
+      olt_name: 'OLT Name',
+      ont_type: 'ONT Type',
+      pon_port: 'PON Port',
+      ont_port: 'ONT Port',
+      sap_id: 'SAP ID',
+      notified_to_bss: 'Notified to BSS',
+    };
+    if (labels[key]) return labels[key];
     return key
       .split('_')
       .map(word => word.charAt(0).toUpperCase() + word.slice(1))
@@ -308,6 +326,49 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
             </Box>
           )}
         </Box>
+      </Box>
+    </Grid>
+  );
+
+  const renderPlainField = (key: string, value: any) => (
+    <Grid
+      item
+      xs={12}
+      sm={6}
+      md={3}
+      key={key}
+      sx={{ flexBasis: { md: '20%' }, maxWidth: { md: '20%' } }}
+    >
+      <Box sx={{ position: 'relative', pr: fieldActions?.[key] ? 3 : 0 }}>
+        <Typography
+          variant="caption"
+          color="primary.main"
+          sx={FIELD_LABEL_SX}
+        >
+          {formatLabel(key)}
+        </Typography>
+        {fieldActions?.[key] && (
+          <IconButton
+            size="small"
+            aria-label={fieldActions[key].label}
+            onClick={fieldActions[key].onClick}
+            sx={{ position: 'absolute', top: -2, right: 0, p: 0.25 }}
+          >
+            {fieldActions[key].icon}
+          </IconButton>
+        )}
+        <Typography
+          variant="body2"
+          sx={{
+            wordBreak: 'break-word',
+            color: value ? 'text.primary' : 'text.disabled',
+            fontSize: '0.82rem',
+            lineHeight: 1.35,
+            ...fieldValueStyles?.[key],
+          }}
+        >
+          {formatValue(value)}
+        </Typography>
       </Box>
     </Grid>
   );
@@ -534,49 +595,66 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
         </DialogTitle>
         <Divider />
         <DialogContent sx={{ pt: 2 }}>
-          <Card variant="outlined" sx={{ mb: 2 }}>
-            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-              <Grid container spacing={1.5}>
-                {contentEntries.map(([key, value]) =>
-                  value && typeof value === 'object' && !Array.isArray(value)
-                    ? renderObjectField(key, value as Record<string, any>)
-                    : renderField(key, value)
+          {sections ? (
+            sections.map((section) => (
+              <Box sx={{ mb: 2 }} key={section.title}>
+                <Typography variant="subtitle2" sx={{ mb: 0.25, fontWeight: 700 }}>
+                  {section.title}
+                </Typography>
+                <Card variant="outlined">
+                  <CardContent sx={{ px: 2, py: 1, '&:last-child': { pb: 1 } }}>
+                    <Grid container spacing={1.5}>
+                      {section.fields.map((key) => renderPlainField(key, data[key]))}
+                    </Grid>
+                  </CardContent>
+                </Card>
+              </Box>
+            ))
+          ) : (
+            <Card variant="outlined" sx={{ mb: 2 }}>
+              <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                <Grid container spacing={1.5}>
+                  {contentEntries.map(([key, value]) =>
+                    value && typeof value === 'object' && !Array.isArray(value)
+                      ? renderObjectField(key, value as Record<string, any>)
+                      : renderField(key, value)
+                  )}
+                  {credentialsEntries.length > 0 && (
+                    <Grid item xs={12}>
+                      <Box sx={{ mt: 1 }}>
+                        <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                          Credentials
+                        </Typography>
+                        <Grid container spacing={1.5}>
+                          {credentialsEntries.map(([key, value]) =>
+                            key === 'username'
+                              ? renderSensitiveField('username', value, showUsername, () =>
+                                  setShowUsername((prev) => !prev)
+                                )
+                              : renderSensitiveField('password', value, showPassword, () =>
+                                  setShowPassword((prev) => !prev)
+                                )
+                          )}
+                        </Grid>
+                      </Box>
+                    </Grid>
+                  )}
+                </Grid>
+                {hasValidCoordinates() && (
+                  <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<MaterialSymbol name="map" />}
+                      onClick={() => setMapDialogOpen(true)}
+                    >
+                      Show Map
+                    </Button>
+                  </Box>
                 )}
-                {credentialsEntries.length > 0 && (
-                  <Grid item xs={12}>
-                    <Box sx={{ mt: 1 }}>
-                      <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                        Credentials
-                      </Typography>
-                      <Grid container spacing={1.5}>
-                        {credentialsEntries.map(([key, value]) =>
-                          key === 'username'
-                            ? renderSensitiveField('username', value, showUsername, () =>
-                                setShowUsername((prev) => !prev)
-                              )
-                            : renderSensitiveField('password', value, showPassword, () =>
-                                setShowPassword((prev) => !prev)
-                              )
-                        )}
-                      </Grid>
-                    </Box>
-                  </Grid>
-                )}
-              </Grid>
-              {hasValidCoordinates() && (
-                <Box sx={{ mt: 3, display: 'flex', justifyContent: 'center' }}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<MaterialSymbol name="map" />}
-                    onClick={() => setMapDialogOpen(true)}
-                  >
-                    Show Map
-                  </Button>
-                </Box>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
           {metadataEntries.length > 0 && (
             <Box sx={{ mt: 2, px: 1 }}>
               <Grid container spacing={1.5}>
