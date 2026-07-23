@@ -343,7 +343,7 @@ const OntFiles: React.FC = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       const contentDisposition = response.headers?.['content-disposition'];
-      const filenameMatch = contentDisposition?.match(/filename\*?=(?:UTF-8''|")?([^\";]+)/i);
+      const filenameMatch = contentDisposition?.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
       const decodedFilename = filenameMatch?.[1]
         ? decodeURIComponent(filenameMatch[1].replace(/"/g, ''))
         : null;
