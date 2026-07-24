@@ -283,6 +283,14 @@ export const oltModels = {
     return response.data?.data?.[0] || null;
   },
 };
+export const ontModels = createCrudApi('/ont_model');
+export const ontConfigTemplates = {
+  ...createCrudApi('/ont_config_template'),
+  render: async (id: string, context: Record<string, any>) => {
+    const response = await api.post(`/ont_config_template/${id}/render`, { context });
+    return response.data;
+  },
+};
 export const oltLineCardModels = createCrudApi('/olt_line_card_model');
 export const oltUplinkCardModels = createCrudApi('/olt_uplink_card_model');
 export const bngModels = createCrudApi('/bng_model');

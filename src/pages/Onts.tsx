@@ -32,13 +32,12 @@ import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
 import { FormDialogGrid, FormDialogItem, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import { useResultBar } from '../contexts/ResultBarContext.tsx';
-import { onts, olts } from '../services/api.ts';
+import { onts, olts, ontModels } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
 const columns = [
   { id: 'serial_number', label: 'Serial Number' },
   { id: 'sap_id', label: 'SAP ID' },
-  { id: 'vendor', label: 'Vendor' },
   { id: 'model', label: 'Model' },
   { 
     id: 'admin_status', 
@@ -261,6 +260,17 @@ const Onts: React.FC = () => {
   );
 
   const { data: oltsData } = useQuery(['olts'], () => olts.getAll());
+  const { data: ontModelsData } = useQuery(
+    ['ont-models-for-onts'],
+    () => ontModels.getAll({ size: 1000, sort: 'name' }),
+  );
+  const ontModelNameByCode = new Map(
+    (ontModelsData?.data || []).map((model: any) => [model.code, model.name]),
+  );
+  const tableData = (data?.data || []).map((ont: any) => ({
+    ...ont,
+    model: ontModelNameByCode.get(ont.model) || ont.model || 'N/A',
+  }));
 
   const isCatvOnt =
     viewingOnt?.type === 'DO_CATV' || viewingOnt?.ont_type === 'DO_CATV';
@@ -288,7 +298,6 @@ const Onts: React.FC = () => {
         id: viewingOnt.id,
         serial_number: viewingOnt.serial_number,
         ont_type: viewingOnt.ont_type ?? viewingOnt.type,
-        vendor: viewingOnt.vendor,
         model: viewingOnt.model,
         olt_name: viewingOnt.olt_name,
         pon_port: viewingOnt.pon_port ?? viewingOnt.port,
@@ -561,7 +570,7 @@ const Onts: React.FC = () => {
 
       <DataTable
         columns={columns}
-        data={data?.data || []}
+        data={tableData}
         total={data?.pagination.total || 0}
         page={page}
         rowsPerPage={rowsPerPage}
@@ -580,8 +589,7 @@ const Onts: React.FC = () => {
           <DialogContent sx={formDialogContentSx}>
             <FormDialogGrid>
               <FormDialogItem><TextField autoFocus name="serial_number" label="Serial Number" type="text" fullWidth defaultValue={editingOnt?.serial_number || ''} required /></FormDialogItem>
-              <FormDialogItem><TextField name="vendor" label="Vendor" type="text" fullWidth defaultValue={editingOnt?.vendor || ''} /></FormDialogItem>
-              <FormDialogItem><TextField name="model" label="Model" type="text" fullWidth defaultValue={editingOnt?.model || ''} /></FormDialogItem>
+              <FormDialogItem><TextField name="model" label="Model Code" type="text" fullWidth defaultValue={editingOnt?.model || ''} /></FormDialogItem>
               <FormDialogItem><TextField select name="olt_id" label="OLT" fullWidth defaultValue={editingOnt?.olt_id || ''} required>{oltsData?.data.map((olt: any) => <MenuItem key={olt.id} value={olt.id}>{olt.name}</MenuItem>)}</TextField></FormDialogItem>
               <FormDialogItem><TextField name="port" label="Port" type="text" fullWidth defaultValue={editingOnt?.port || ''} required /></FormDialogItem>
             </FormDialogGrid>
@@ -603,7 +611,7 @@ const Onts: React.FC = () => {
         sections={[
           {
             title: 'General',
-            fields: ['serial_number', 'ont_type', 'vendor', 'model', 'olt_name'],
+            fields: ['serial_number', 'ont_type', 'model', 'olt_name'],
           },
           {
             title: 'PON',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Alert,
@@ -10,16 +10,21 @@ import {
   DialogContent,
   DialogTitle,
   TextField,
+  Typography,
 } from '@mui/material';
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import MaterialSymbol from '../components/MaterialSymbol.tsx';
 import { FormDialogGrid, FormDialogItem, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
-import { configTemplates } from '../services/api.ts';
+import { configTemplates, oltModels } from '../services/api.ts';
 import { formatTableDateTime, UPDATED_AT_DESC_SORT } from '../utils/table.ts';
 
 const formatOptional = (value: string | null | undefined) =>
   value === null || value === undefined || value === '' ? 'N/A' : value;
+
+const formatOltModelDisplayName = (model: any, fallback: unknown) =>
+  [model?.vendor, model?.name].filter(Boolean).join(' ') || String(fallback);
 
 const getErrorMessage = (error: any) =>
   error?.response?.data?.detail?.[0]?.msg ||
@@ -39,12 +44,10 @@ const getTemplateText = (template: any) =>
 
 const normalizeTemplateForDetails = (template: any) => {
   const normalized = { ...template };
-  if (Array.isArray(normalized.olt_model_codes)) {
-    normalized.olt_model_codes = normalized.olt_model_codes.join(', ');
-  }
-  if (Array.isArray(normalized.olt_model_ids)) {
-    normalized.olt_model_ids = normalized.olt_model_ids.join(', ');
-  }
+  delete normalized.olt_model_codes;
+  delete normalized.olt_model_ids;
+  delete normalized.model;
+  delete normalized.models;
   delete normalized.is_active;
   return normalized;
 };
@@ -56,12 +59,28 @@ const ConfigTemplates: React.FC = () => {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<any>(null);
   const [viewingTemplate, setViewingTemplate] = useState<any>(null);
+  const [viewingSupportedOltModels, setViewingSupportedOltModels] = useState<string[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [templateBody, setTemplateBody] = useState('');
 
   const { data, isLoading, refetch } = useQuery(
     ['config-templates', page, rowsPerPage],
     () => configTemplates.getAll({ page: page + 1, size: rowsPerPage, sort: UPDATED_AT_DESC_SORT })
+  );
+
+  const { data: oltModelsData } = useQuery(
+    ['config-templates-olt-models'],
+    () => oltModels.getAll({ size: 1000, sort: 'name' })
+  );
+
+  const oltModelByCode = useMemo(
+    () => new Map((oltModelsData?.data || []).map((model: any) => [model.code, model])),
+    [oltModelsData]
+  );
+
+  const oltModelById = useMemo(
+    () => new Map((oltModelsData?.data || []).map((model: any) => [model.id, model])),
+    [oltModelsData]
   );
 
   const openCreateDialog = () => {
@@ -72,8 +91,75 @@ const ConfigTemplates: React.FC = () => {
   };
 
   const handleView = (template: any) => {
+    const codes = Array.isArray(template.olt_model_codes)
+      ? template.olt_model_codes
+      : String(template.olt_model_codes || '').split(',').map((code) => code.trim()).filter(Boolean);
+    const ids = Array.isArray(template.olt_model_ids)
+      ? template.olt_model_ids
+      : String(template.olt_model_ids || '').split(',').map((id) => id.trim()).filter(Boolean);
+    const models = Array.isArray(template.models)
+      ? template.models
+      : String(template.models || '').split(',').map((model) => model.trim()).filter(Boolean);
+    setViewingSupportedOltModels(
+      (codes.length > 0
+        ? codes.map((code: string) => formatOltModelDisplayName(oltModelByCode.get(code), code))
+        : ids.length > 0
+          ? ids.map((id: string) => formatOltModelDisplayName(oltModelById.get(id), id))
+          : models.length > 0
+            ? models.map((model: any) => {
+                if (typeof model === 'object' && model !== null) {
+                  return formatOltModelDisplayName(
+                    model.name ? model : oltModelByCode.get(model.code) || oltModelById.get(model.id),
+                    model.code || model.id
+                  );
+                }
+                return formatOltModelDisplayName(oltModelByCode.get(model) || oltModelById.get(model), model);
+              })
+          : String(template.model || '').split(',').map((code) => code.trim()).filter(Boolean)
+            .map((code) => formatOltModelDisplayName(oltModelByCode.get(code), code)))
+        .map((modelName: unknown) => String(modelName))
+    );
     setViewingTemplate(normalizeTemplateForDetails(template));
     setDetailDialogOpen(true);
+  };
+
+  const renderSupportedOltModels = () => {
+    if (!viewingTemplate || viewingSupportedOltModels.length === 0) return null;
+
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
+          <MaterialSymbol name="dns" sx={{ color: 'primary.main', fontSize: 20 }} />
+          <Typography variant="caption" sx={{ color: 'primary.dark', fontWeight: 800, letterSpacing: 0.45 }}>
+            SUPPORTED OLT MODELS
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+          {viewingSupportedOltModels.map((modelName) => (
+            <Box
+              key={modelName}
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.5,
+                px: 1,
+                py: 0.45,
+                border: 1,
+                borderColor: 'primary.light',
+                borderRadius: 1.5,
+                bgcolor: '#f4f7ff',
+                color: 'primary.main',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+              }}
+            >
+              <MaterialSymbol name="check_circle" sx={{ fontSize: 15 }} />
+              {modelName}
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    );
   };
 
   const handleEdit = async (template: any) => {
@@ -186,6 +272,9 @@ const ConfigTemplates: React.FC = () => {
         data={viewingTemplate}
         fullWidthFields={['body', 'template']}
         preformattedFields={['body', 'template']}
+        extraContent={renderSupportedOltModels()}
+        extraContentBeforeMetadata
+        extraContentInMainCard
       />
     </Layout>
   );

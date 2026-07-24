@@ -166,6 +166,16 @@ const Olts: React.FC = () => {
     [oltModelsData]
   );
 
+  const modelById = useMemo(
+    () => new Map((oltModelsData?.data || []).map((model: any) => [model.id, model])),
+    [oltModelsData]
+  );
+
+  const modelByCode = useMemo(
+    () => new Map((oltModelsData?.data || []).map((model: any) => [model.code, model])),
+    [oltModelsData]
+  );
+
   const columns = useMemo(
     () => [
       { id: 'name', label: 'Name' },
@@ -288,14 +298,46 @@ const Olts: React.FC = () => {
       return null;
     }
 
-    if (!viewingOltDetails) {
-      return viewingOlt;
-    }
+    const merged = viewingOltDetails
+      ? { ...viewingOltDetails, pop_name: popNameById.get(viewingOltDetails.pop_id) || 'N/A' }
+      : { ...viewingOlt };
+    const rawModel = merged.model;
+    const rawModelObject = rawModel && typeof rawModel === 'object' ? rawModel : null;
+    const modelReferences = [
+      merged.model_code,
+      merged.model_id,
+      merged.olt_model_code,
+      merged.olt_model_id,
+      typeof rawModel === 'string' ? rawModel : null,
+      rawModelObject?.code,
+      rawModelObject?.id,
+      rawModelObject?.name,
+      merged.model_name,
+    ].filter(Boolean).map(String);
+    const oltModel = modelReferences
+      .map((reference) => modelByCode.get(reference) || modelById.get(reference))
+      .find(Boolean)
+      || (oltModelsData?.data || []).find((model: any) =>
+        modelReferences.includes(String(model.id)) ||
+        modelReferences.includes(String(model.code)) ||
+        modelReferences.includes(String(model.name))
+      );
+    const modelDisplayName =
+      [oltModel?.vendor, oltModel?.name].filter(Boolean).join(' ') ||
+      [rawModelObject?.vendor, rawModelObject?.name].filter(Boolean).join(' ') ||
+      merged.model_name ||
+      (typeof rawModel === 'string' ? rawModel : '') ||
+      'N/A';
 
-    const merged = decorateOlt(viewingOltDetails);
     delete merged.pop_id;
-    return merged;
-  }, [decorateOlt, viewingOlt, viewingOltDetails]);
+    delete merged.model_id;
+    delete merged.model_code;
+    delete merged.model_name;
+    delete merged.olt_model_id;
+    delete merged.olt_model_code;
+
+    return { ...merged, model: modelDisplayName };
+  }, [modelByCode, modelById, oltModelsData, popNameById, viewingOlt, viewingOltDetails]);
 
   const initializationProcesses = useMemo(
     () =>
@@ -610,6 +652,29 @@ const Olts: React.FC = () => {
         onClose={handleCloseDetailDialog}
         title="OLT Details"
         data={detailedViewingOlt}
+        fieldValueRenderers={{
+          model: (
+            <Box
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.5,
+                px: 1,
+                py: 0.45,
+                border: 1,
+                borderColor: 'primary.light',
+                borderRadius: 1.5,
+                bgcolor: '#f4f7ff',
+                color: 'primary.main',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+              }}
+            >
+              <MaterialSymbol name="check_circle" sx={{ fontSize: 15 }} />
+              {detailedViewingOlt?.model || 'N/A'}
+            </Box>
+          ),
+        }}
         extraContent={
           <Box>
             <Typography variant="h6" sx={{ mb: 1.5, fontWeight: 600 }}>

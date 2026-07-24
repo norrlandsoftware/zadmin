@@ -1421,67 +1421,71 @@ const OltSettings: React.FC = () => {
               />
               <Box
                 sx={{
-                  minHeight: 42,
-                  px: 0.75,
+                  minHeight: 74,
                   py: 0.5,
-                  border: 1,
-                  borderColor: 'text.primary',
-                  borderRadius: 1,
-                  bgcolor: '#bdbdbd',
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: 0.75,
-                  alignItems: 'center',
                 }}
               >
-                {getAvailableUplinkPortNames(slot.uplinkCardModelId).length === 0 ? (
-                  <Typography variant="body2" color="text.secondary">
-                    N/A
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.2 }}>
+                  <MaterialSymbol name="settings_ethernet" sx={{ color: 'primary.main', fontSize: 20 }} />
+                  <Typography
+                    variant="caption"
+                    sx={{ color: 'primary.dark', fontWeight: 800, letterSpacing: 0.45 }}
+                  >
+                    UPLINK PORTS
                   </Typography>
-                ) : (
-                  getAvailableUplinkPortNames(slot.uplinkCardModelId).map((portName) => {
-                    const isSelected = slot.uplinkPorts.includes(portName);
-                    return (
-                      <Button
-                        key={portName}
-                        size="small"
-                        variant="contained"
-                        disableElevation
-                        onClick={() => {
-                          if (slot.lag) {
-                            const nextPorts = isSelected
-                              ? slot.uplinkPorts.filter((value) => value !== portName)
-                              : [...slot.uplinkPorts, portName];
-                            updateUplinkSlot(slot.slotNumber, { uplinkPorts: nextPorts });
-                            return;
-                          }
+                </Box>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                  {getAvailableUplinkPortNames(slot.uplinkCardModelId).length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                      N/A
+                    </Typography>
+                  ) : (
+                    getAvailableUplinkPortNames(slot.uplinkCardModelId).map((portName) => {
+                      const isSelected = slot.uplinkPorts.includes(portName);
+                      return (
+                        <Button
+                          key={portName}
+                          size="small"
+                          variant="outlined"
+                          onClick={() => {
+                            if (slot.lag) {
+                              const nextPorts = isSelected
+                                ? slot.uplinkPorts.filter((value) => value !== portName)
+                                : [...slot.uplinkPorts, portName];
+                              updateUplinkSlot(slot.slotNumber, { uplinkPorts: nextPorts });
+                              return;
+                            }
 
-                          updateUplinkSlot(slot.slotNumber, {
-                            uplinkPorts: isSelected ? [] : [portName],
-                          });
-                        }}
-                        sx={{
-                          minWidth: 0,
-                          px: 1.25,
-                          py: 0.35,
-                          borderRadius: 1,
-                          lineHeight: 1,
-                          fontSize: '0.8rem',
-                          textTransform: 'none',
-                          border: 1,
-                          borderColor: 'text.primary',
-                          bgcolor: isSelected ? 'primary.main' : 'background.paper',
-                          color: isSelected ? 'common.white' : 'text.primary',
-                          '&:hover': {
-                            bgcolor: isSelected ? 'primary.dark' : 'grey.50',
-                          },
-                        }}
-                      >
-                        {portName}
-                      </Button>
-                    );
-                  })
-                )}
+                            updateUplinkSlot(slot.slotNumber, {
+                              uplinkPorts: isSelected ? [] : [portName],
+                            });
+                          }}
+                          startIcon={<MaterialSymbol name="settings_ethernet" sx={{ fontSize: 15 }} />}
+                          sx={{
+                            minWidth: 0,
+                            px: 1,
+                            py: 0.45,
+                            borderRadius: 1.5,
+                            lineHeight: 1,
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            borderColor: 'primary.light',
+                            bgcolor: isSelected ? 'primary.main' : '#f4f7ff',
+                            color: isSelected ? 'common.white' : 'primary.main',
+                            '& .MuiButton-startIcon': { mr: 0.5 },
+                            '&:hover': {
+                              borderColor: 'primary.main',
+                              bgcolor: isSelected ? 'primary.dark' : '#e8efff',
+                            },
+                          }}
+                        >
+                          {portName}
+                        </Button>
+                      );
+                    })
+                  )}
+                </Box>
               </Box>
             </Box>
           ))}

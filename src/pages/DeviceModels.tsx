@@ -13,15 +13,18 @@ import {
   ListItemText,
   MenuItem,
   TextField,
+  Typography,
 } from '@mui/material';
 import Layout from '../components/Layout.tsx';
 import DataTable from '../components/DataTable.tsx';
 import DetailDialog from '../components/DetailDialog.tsx';
+import MaterialSymbol from '../components/MaterialSymbol.tsx';
 import { FormDialogGrid, FormDialogItem, formDialogActionsSx, formDialogContentSx, formDialogPaperSx, formDialogTitleSx } from '../components/FormDialogLayout.tsx';
 import {
   bngModels,
   oltLineCardModels,
   oltModels,
+  ontModels,
   oltUplinkCardModels,
   switchModels,
 } from '../services/api.ts';
@@ -63,6 +66,9 @@ const formatBoolean = (value: boolean | null | undefined) => {
 const formatOptional = (value: string | number | null | undefined) =>
   value === null || value === undefined || value === '' ? 'N/A' : String(value);
 
+const formatOltModelDisplayName = (model: any, fallback: unknown) =>
+  [model?.vendor, model?.name].filter(Boolean).join(' ') || String(fallback);
+
 const commonFields: DeviceModelField[] = [
   { name: 'name', label: 'Name', required: true },
   { name: 'vendor', label: 'Vendor', required: true },
@@ -70,6 +76,28 @@ const commonFields: DeviceModelField[] = [
 ];
 
 const deviceModelConfigs: Record<string, DeviceModelConfig> = {
+  ont: {
+    title: 'ONT Models',
+    singular: 'ONT Model',
+    queryKey: 'ont-models',
+    api: ontModels,
+    fields: [
+      { name: 'code', label: 'Code', required: true },
+      { name: 'olt_match_model', label: 'OLT Match Model', required: true },
+      { name: 'name', label: 'Name', required: true },
+      { name: 'vendor', label: 'Vendor', required: true },
+      { name: 'ont_type', label: 'ONT Type', required: true },
+      { name: 'description', label: 'Description', type: 'textarea' },
+    ],
+    columns: [
+      { id: 'code', label: 'Code' },
+      { id: 'olt_match_model', label: 'OLT Match Model' },
+      { id: 'name', label: 'Name' },
+      { id: 'vendor', label: 'Vendor' },
+      { id: 'ont_type', label: 'ONT Type' },
+      { id: 'updated_at', label: 'Updated At', format: formatTableDateTime },
+    ],
+  },
   olt: {
     title: 'OLT Models',
     singular: 'OLT Model',
@@ -221,6 +249,8 @@ const DeviceModels: React.FC = () => {
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [editingModel, setEditingModel] = useState<any>(null);
   const [viewingModel, setViewingModel] = useState<any>(null);
+  const [viewingUplinkPorts, setViewingUplinkPorts] = useState<string[]>([]);
+  const [viewingSupportedOltModels, setViewingSupportedOltModels] = useState<string[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
 
   const queryKey = useMemo(
@@ -245,6 +275,11 @@ const DeviceModels: React.FC = () => {
 
   const oltModelById = useMemo(
     () => new Map((oltModelsData?.data || []).map((model: any) => [model.id, model])),
+    [oltModelsData]
+  );
+
+  const oltModelByCode = useMemo(
+    () => new Map((oltModelsData?.data || []).map((model: any) => [model.code, model])),
     [oltModelsData]
   );
 
@@ -310,23 +345,22 @@ const DeviceModels: React.FC = () => {
       details.slots = slots;
     }
 
-    if (modelType === 'olt-line-card' || modelType === 'olt-uplink-card') {
-      const explicitCodes: string[] = Array.isArray(model.olt_model_codes) ? model.olt_model_codes : [];
-      const supportedIds: string[] = Array.isArray(model.olt_model_ids) ? model.olt_model_ids : [];
-      const supportedCodes = explicitCodes.length > 0
-        ? explicitCodes
-        : supportedIds.length > 0
-          ? supportedIds.map((supportedId) => {
-              const supportedModel = oltModelById.get(supportedId as any);
-              return supportedModel?.code || supportedModel?.name || supportedId;
-            })
-          : ['All OLT models supported'];
-
-      details.supported_olt_model_codes = supportedCodes.join(', ');
+    if (modelType === 'ont') {
+      delete details.olt_supported_model;
+      delete details.olt_supported_models;
+      delete details.compatible_olt_models;
     }
 
-    if (modelType === 'olt-uplink-card' && Array.isArray(details.uplink_port_names)) {
-      details.uplink_port_names = details.uplink_port_names.join(', ');
+    if (modelType === 'switch') {
+      delete details.compatible_olt_models;
+    }
+
+    if (modelType === 'olt-line-card' || modelType === 'olt-uplink-card') {
+      delete details.supported_olt_model_codes;
+    }
+
+    if (modelType === 'olt-uplink-card') {
+      delete details.uplink_port_names;
     }
 
     if (modelType === 'olt-line-card' || modelType === 'olt-uplink-card' || modelType === 'bng') {
@@ -342,7 +376,7 @@ const DeviceModels: React.FC = () => {
     }
 
     return details;
-  }, [modelType, oltModelById]);
+  }, [modelType]);
 
   const handleView = (model: any) => {
     const modelWithNames = shouldLoadOltModels
@@ -351,6 +385,33 @@ const DeviceModels: React.FC = () => {
           compatible_olt_models: formatOltModelIds(model.olt_model_ids),
         }
       : model;
+    setViewingUplinkPorts(
+      modelType === 'olt-uplink-card'
+        ? (Array.isArray(model.uplink_port_names)
+            ? model.uplink_port_names
+            : String(model.uplink_port_names || '').split(','))
+          .map((port: unknown) => String(port).trim())
+          .filter(Boolean)
+        : []
+    );
+    const explicitCodes = Array.isArray(model.olt_model_codes) ? model.olt_model_codes : [];
+    const supportedIds = Array.isArray(model.olt_model_ids) ? model.olt_model_ids : [];
+    setViewingSupportedOltModels(
+      modelType === 'olt-line-card' || modelType === 'olt-uplink-card'
+        ? (explicitCodes.length > 0
+            ? explicitCodes.map((code) => {
+                const supportedModel = oltModelByCode.get(code);
+                return formatOltModelDisplayName(supportedModel, code);
+              })
+            : supportedIds.length > 0
+              ? supportedIds.map((supportedId) => {
+                  const supportedModel = oltModelById.get(supportedId);
+                  return formatOltModelDisplayName(supportedModel, supportedId);
+                })
+              : ['All OLT models supported'])
+          .map((modelCode: unknown) => String(modelCode))
+        : []
+    );
     setViewingModel(buildModelDetails(modelWithNames));
     setDetailDialogOpen(true);
   };
@@ -365,6 +426,134 @@ const DeviceModels: React.FC = () => {
     setDialogOpen(false);
     setEditingModel(null);
     setFormError(null);
+  };
+
+  const renderPortSection = () => {
+    if (!viewingModel || modelType !== 'olt-uplink-card') {
+      return null;
+    }
+
+    const portGroups = [{
+      label: 'UPLINK PORTS',
+      ports: viewingUplinkPorts,
+      fallbackCount: Number(viewingModel.number_of_uplink_port || 0),
+      fallbackPrefix: 'xfp',
+    }];
+
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+        {portGroups.map(({ label, ports, fallbackCount, fallbackPrefix }) => {
+          const availablePorts = ports.length > 0
+            ? ports
+            : Array.from({ length: fallbackCount }, (_, index) => `${fallbackPrefix}${index + 1}`);
+
+          return (
+            <Box key={label}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
+                <MaterialSymbol name="settings_ethernet" sx={{ color: 'primary.main', fontSize: 20 }} />
+                <Typography
+                  variant="caption"
+                  sx={{ color: 'primary.dark', fontWeight: 800, letterSpacing: 0.45 }}
+                >
+                  {label}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                {availablePorts.length > 0 ? availablePorts.map((port) => (
+                  <Box
+                    key={port}
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      px: 1,
+                      py: 0.45,
+                      border: 1,
+                      borderColor: 'primary.light',
+                      borderRadius: 1.5,
+                      bgcolor: '#f4f7ff',
+                      color: 'primary.main',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                    }}
+                  >
+                    <MaterialSymbol name="settings_ethernet" sx={{ fontSize: 15 }} />
+                    {port}
+                  </Box>
+                )) : (
+                  <Typography variant="body2" color="text.secondary">N/A</Typography>
+                )}
+              </Box>
+            </Box>
+          );
+        })}
+      </Box>
+    );
+  };
+
+  const renderSupportedOltModelsSection = () => {
+    if (!viewingModel || (modelType !== 'olt-line-card' && modelType !== 'olt-uplink-card')) {
+      return null;
+    }
+
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.75 }}>
+          <MaterialSymbol name="dns" sx={{ color: 'primary.main', fontSize: 20 }} />
+          <Typography
+            variant="caption"
+            sx={{ color: 'primary.dark', fontWeight: 800, letterSpacing: 0.45 }}
+          >
+            SUPPORTED OLT MODELS
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          {viewingSupportedOltModels.map((modelCode) => (
+            <Box
+              key={modelCode}
+              sx={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 0.5,
+                px: 1,
+                py: 0.45,
+                border: 1,
+                borderColor: 'primary.light',
+                borderRadius: 1.5,
+                bgcolor: '#f4f7ff',
+                color: 'primary.main',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+              }}
+            >
+              <MaterialSymbol name="check_circle" sx={{ fontSize: 15 }} />
+              {modelCode}
+            </Box>
+          ))}
+        </Box>
+      </Box>
+    );
+  };
+
+  const renderCardDetailSections = () => {
+    const supportedOltModels = renderSupportedOltModelsSection();
+    const ports = renderPortSection();
+
+    if (!supportedOltModels && !ports) return null;
+
+    return (
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: ports ? { xs: '1fr', md: 'minmax(0, 1fr) minmax(0, 1fr)' } : '1fr',
+          gap: 2.5,
+          alignItems: 'start',
+        }}
+      >
+        {supportedOltModels}
+        {ports}
+      </Box>
+    );
   };
 
   const handleSave = async (event: React.FormEvent) => {
@@ -529,6 +718,9 @@ const DeviceModels: React.FC = () => {
         onClose={() => setDetailDialogOpen(false)}
         title={`${config.singular} Details`}
         data={viewingModel}
+        extraContent={renderCardDetailSections()}
+        extraContentBeforeMetadata
+        extraContentInMainCard
       />
     </Layout>
   );

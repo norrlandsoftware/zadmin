@@ -35,6 +35,8 @@ interface DetailDialogProps {
   data: any;
   actions?: React.ReactNode;
   extraContent?: React.ReactNode;
+  extraContentBeforeMetadata?: boolean;
+  extraContentInMainCard?: boolean;
   fieldActions?: Record<string, DetailDialogFieldAction>;
   fullWidthFields?: string[];
   htmlPreviewFields?: string[];
@@ -42,6 +44,7 @@ interface DetailDialogProps {
   sections?: DetailDialogSection[];
   fieldValueStyles?: Record<string, any>;
   fieldControls?: Record<string, React.ReactNode>;
+  fieldValueRenderers?: Record<string, React.ReactNode>;
 }
 
 const FIELD_LABEL_SX = {
@@ -72,6 +75,8 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   data,
   actions,
   extraContent,
+  extraContentBeforeMetadata = false,
+  extraContentInMainCard = false,
   fieldActions,
   fullWidthFields = [],
   htmlPreviewFields = [],
@@ -79,6 +84,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
   sections,
   fieldValueStyles,
   fieldControls,
+  fieldValueRenderers,
 }) => {
   const [mapDialogOpen, setMapDialogOpen] = useState(false);
   const [showUsername, setShowUsername] = useState(false);
@@ -246,7 +252,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
             </Typography>
           ) : (
             <Box>
-              {preformattedFields.includes(key) && typeof value === 'string' ? (
+              {fieldValueRenderers?.[key] ?? (preformattedFields.includes(key) && typeof value === 'string' ? (
                 <Box sx={{ position: 'relative' }}>
                   <Typography
                     variant="body2"
@@ -302,7 +308,7 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
                 >
                   {formatValue(value)}
                 </Typography>
-              )}
+              ))}
               {htmlPreviewFields.includes(key) && typeof value === 'string' && value.trim() && (
                 <Box sx={{ mt: 2 }}>
                   <Typography
@@ -657,8 +663,14 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
                     </Button>
                   </Box>
                 )}
+                {extraContent && extraContentBeforeMetadata && extraContentInMainCard && (
+                  <Box sx={{ mt: 3 }}>{extraContent}</Box>
+                )}
               </CardContent>
             </Card>
+          )}
+          {extraContent && extraContentBeforeMetadata && !extraContentInMainCard && (
+            <Box sx={{ mt: 3 }}>{extraContent}</Box>
           )}
           {metadataEntries.length > 0 && (
             <Box sx={{ mt: 2, px: 1 }}>
@@ -685,7 +697,9 @@ const DetailDialog: React.FC<DetailDialogProps> = ({
               </Grid>
             </Box>
           )}
-          {extraContent && <Box sx={{ mt: 3 }}>{extraContent}</Box>}
+          {extraContent && !extraContentBeforeMetadata && !extraContentInMainCard && (
+            <Box sx={{ mt: 3 }}>{extraContent}</Box>
+          )}
         </DialogContent>
         <Divider />
         <DialogActions sx={{ px: 3, py: 2 }}>

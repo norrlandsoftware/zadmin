@@ -26,6 +26,7 @@ import OntFiles from './pages/OntFiles.tsx';
 import ResetPassword from './pages/ResetPassword.tsx';
 import About from './pages/About.tsx';
 import DeviceModels from './pages/DeviceModels.tsx';
+import OntConfigTemplates from './pages/OntConfigTemplates.tsx';
 
 const queryClient = new QueryClient();
 
@@ -169,6 +170,14 @@ const App: React.FC = () => {
                 element={
                   <PrivateRoute>
                     <ConfigTemplates />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/ont-config-templates/*"
+                element={
+                  <PrivateRoute>
+                    <OntConfigTemplates />
                   </PrivateRoute>
                 }
               />
